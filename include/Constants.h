@@ -5,6 +5,7 @@
 #define TEXT_COLOR 0xC618
 #define AXIS_COLOR 0x07E0
 #define TICK_COLOR 0x07E0
+#define PLOT_COLOR 0xFFFF
 #define TICK_LEN 10
 #define TICK_PER 6
 

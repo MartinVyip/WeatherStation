@@ -5,6 +5,7 @@
 
 #include <Constants.h>
 #include <GraphingEngine.h>
+#include <DataVault.h>
 
 #include <Adafruit_GFX.h>
 #include <Adafruit_ILI9341.h>
@@ -57,7 +58,8 @@ inline void co2Setup() {
     co2.autoCalibration(false);
 }
 
-Graph <float> out_temp(1680, tft);
+DataVault <float> out_temp(1680);
+Graph <float> out_plot(out_temp, tft);
 
 void setup() {
     UART.begin(115200);
@@ -70,19 +72,16 @@ void setup() {
     eeprom.begin();
     bme.begin(0x76, &I2C);
 
-    const int numPoints = 240; // Number of data points (e.g., 24 hours / 6 minutes per data point)
-    const float frequency = 1.0;
-    const float attenuation = 0.1;
+    const int numPoints = 1680;
+    const float frequency = 20.0;
 
     int hour = 0;
     int minute = 0;
 
     for (int i = 0; i < numPoints; i++) {
-        float angle = i * (2 * PI / numPoints); // Angle in radians
-        float value = sin(angle * frequency) * exp(-attenuation * i / numPoints); // Attenuating sine wave
-        
-        out_temp.appendValue(value, hour, minute); // Append data to the graph
-        
+        float angle = i * (2 * PI / numPoints);
+        float value = sin(angle * frequency) * (numPoints - i) + 200;
+        out_temp.appendValue(value, hour, minute);
         minute += 6;
         if (minute >= 60) {
             minute = 0;
@@ -93,7 +92,7 @@ void setup() {
         }
     }
 
-    out_temp.drawFreshStaticGraph();
+    out_plot.drawStatic(true, 1600);
 }
 
 void loop() {
