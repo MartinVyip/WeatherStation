@@ -12,20 +12,29 @@ class Graph {
 public:
     Graph(DataVault<input_type>& data_reference, Adafruit_ILI9341& tft_reference);
 
-    void drawStatic(bool local_sizing = true, int16_t endpoint = INT16_MAX);
-    void drawFreshStatic(bool local_sizing = true);
-    void dynamicChange(int8_t step);
+    void drawLocal(bool local_sizing = true);
+    void drawFresh(bool local_sizing = true);
+    void drawCursor();
+    void dynamicPan(int8_t step);
+    void dynamicCursor(int8_t step);
+    void annotate();
 
 private:
     DataVault<input_type>& _data;
     Adafruit_ILI9341& _tft;
+
     int16_t _tick_indexes[24 / TICK_PER];
+    int16_t _curr_startp, _curr_endp;
+    uint8_t _curr_level;
+    uint8_t _prev_values[TFT_XMAX - L_EDGE];
+    input_type _curr_max, _curr_min;
 
     void staticGraphCore(int16_t endp, bool local_sizing);
-    void drawCurve(int16_t startpoint, int16_t endpoint, input_type min_value, input_type max_value, uint8_t axis_level);
-    void drawAxises(uint8_t axis_level);
-    void drawTicks(uint16_t startpoint, uint16_t endpoint);
-    uint8_t findAxisLevel(input_type min_value, input_type max_value);
+    void updateCurve(bool initial = false);
+    void updateAxises(bool initial = false);
+    void updateTicks(bool initial = false);
+
+    void findAxisLevel();
     float mapFloat(float x, float in_min, float in_max, float out_min, float out_max);
 };
 

@@ -2,10 +2,13 @@
 #define Constants_h
 
 // ==================== SETTINGS ====================
-#define TEXT_COLOR 0xC618
-#define AXIS_COLOR 0x07E0
-#define TICK_COLOR 0x07E0
-#define PLOT_COLOR 0xFFFF
+#define PAN_SLOW 20
+#define PAN_FAST 50
+
+#define TEXT_COLOR 0xFC18
+#define AXIS_COLOR 0x7BE0
+#define TICK_COLOR 0x7BE0
+#define PLOT_COLOR 0xC618
 #define TICK_LEN 10
 #define TICK_PER 6
 
@@ -38,6 +41,8 @@
 #define ENC_S2 PA2
 
 // ===============DEVELOPMENT CONSTANTS =============
+#define ENC_FAST_TIME 150
+
 #define TFT_XMAX 320
 #define TFT_YMAX 240
 #define L_EDGE 80
