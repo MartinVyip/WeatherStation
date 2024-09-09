@@ -47,6 +47,7 @@ inline void tftSetup() {
     digitalWrite(TFT_LED, HIGH);
     tft.begin();
     tft.setRotation(3);
+    tft.cp437(true);
 }
 
 inline void radioSetup() {
@@ -72,13 +73,14 @@ inline void co2Setup() {
 }
 
 inline void hardwareSetup() {
+    delay(500);
     UART.begin(115200);
     I2C.begin();
 
-    tftSetup();
+    co2Setup();
     radioSetup();
     rtcSetup();
-    co2Setup();
+    tftSetup();
     eeprom.begin();
     bme.begin(0x76, &I2C);
 
@@ -94,24 +96,31 @@ void setup() {
     const int numPoints = 1680;
     const float frequency = 10;
 
+    int day = 0;
     int hour = 0;
     int minute = 0;
 
     for (int i = 0; i < numPoints; i++) {
         float angle = i * (2 * PI / numPoints);
         float value = sin(angle * frequency) * (numPoints - i);
-        out_temp.appendValue(value, hour, minute);
+        out_temp.appendValue(value, day, hour, minute);
         minute += 6;
         if (minute >= 60) {
             minute = 0;
             hour++;
             if (hour >= 24) {
                 hour = 0;
+                day++;
+                if (day > 7) {
+                    day = 0;
+                }
             }
         }
     }
 
-    plot.drawFresh(false);
+    plot.drawFresh();
+    //plot.annotate();
+    plot.drawCursor();
 }
 
 void loop() {
@@ -146,8 +155,7 @@ void loop() {
             if (enc.left()) {
                 curr_screen = (curr_screen > MAIN) ? (screens)(curr_screen - 1) : CO2_RATE;
                 setup = true;
-            }
-            else if (enc.right()) {
+            } else if (enc.right()) {
                 curr_screen = (curr_screen < CO2_RATE) ? (screens)(curr_screen + 1) : MAIN;
                 setup = true;
             }
@@ -205,7 +213,7 @@ void loop() {
     }
     if (enc.turn()) {
         int8_t step = ((enc.fast()) ? PAN_FAST : PAN_SLOW) * enc.dir();
-        plot.dynamicPan(step);
+        plot.dynamicCursor(step >> 1);
     }
     //UART.printf("%02d.%02d.%02d  ", rtc.getDay(), rtc.getMonth(), rtc.getYear());
     //UART.printf("%02d:%02d:%02d\n", rtc.getHours(), rtc.getMinutes(), rtc.getSeconds());

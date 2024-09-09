@@ -4,13 +4,16 @@
 // ==================== SETTINGS ====================
 #define PAN_SLOW 20
 #define PAN_FAST 50
-
-#define TEXT_COLOR 0xFC18
-#define AXIS_COLOR 0x7BE0
-#define TICK_COLOR 0x7BE0
-#define PLOT_COLOR 0xC618
-#define TICK_LEN 10
 #define TICK_PER 6
+
+// ===================== COLORS =====================
+#define TEXT_CLR1 0xFC18  // ticks
+#define TEXT_CLR2 0xFC18  // weekdays
+#define AXIS_CLR 0x7BE0
+#define TICK_CLR 0x7BE0
+#define SEP_CLR 0x03EF
+#define PLOT_CLR 0xC618
+#define CRSR_CLR 0xF800
 
 // ===================== IO PINS ====================
 #define LED PC6
@@ -48,14 +51,14 @@
 #define L_EDGE 80
 #define UP_EDGE 50
 #define BT_EDGE 220
+#define TICK_LEN 10
+#define SEP_LEN 35
+#define CRECT_SIDE 16
+#define CRECT_HALF (CRECT_SIDE >> 1)
 
 // =================== EXCEPTIONS ===================
 #if (TICK_PER < 4 || 24 % TICK_PER != 0)
 #error "Invalid ticking period"
-#endif
-
-#if (TICK_LEN <= 0 || TICK_LEN > TFT_YMAX - BT_EDGE)
-#error "Invalid tick length"
 #endif
 
 #endif

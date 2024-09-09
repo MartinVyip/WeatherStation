@@ -19,7 +19,7 @@ public:
     DataVault(uint16_t data_size);
     ~DataVault();
 
-    void appendValue(input_type value, uint8_t hour, uint8_t minute);
+    void appendValue(input_type value, uint8_t wday, uint8_t hour, uint8_t min);
     input_type findSampleMax(uint16_t startpoint, uint16_t endpoint) const;
     input_type findSampleMin(uint16_t startpoint, uint16_t endpoint) const;
     const DataPoint<input_type>* getData() const;

@@ -15,35 +15,49 @@ void Graph<input_type>::drawFresh(bool local_sizing) {
 
 template <typename input_type>
 void Graph<input_type>::drawCursor() {
-
+    if (_data.getHeadCount() <= CRECT_SIDE) return;
+    _curr_index = (TFT_XMAX - L_EDGE) >> 1;
+    updateCursor(true);
 }
 
 template <typename input_type>
 void Graph<input_type>::dynamicPan(int8_t step) {
-    if (_data.getHeadCount() > TFT_XMAX - L_EDGE) {
-        int16_t prev_startp = _curr_startp;
+    if (_data.getHeadCount() <= TFT_XMAX - L_EDGE) return;
+    int16_t prev_startp = _curr_startp;
 
-        _curr_startp += step;
-        _curr_endp += step;
-        _curr_startp = constrain(_curr_startp, 0, _data.getHeadCount() + L_EDGE - TFT_XMAX - 1);
-        _curr_endp = constrain(_curr_endp, TFT_XMAX - L_EDGE, _data.getHeadCount() - 1);
+    _curr_startp += step;
+    _curr_endp += step;
+    _curr_startp = constrain(_curr_startp, 0, _data.getHeadCount() + L_EDGE - TFT_XMAX - 1);
+    _curr_endp = constrain(_curr_endp, TFT_XMAX - L_EDGE, _data.getHeadCount() - 1);
 
-        if (prev_startp != _curr_startp) {
-            updateCurve();
-            updateAxises();
-            updateTicks();
-        }
+    if (prev_startp != _curr_startp) {
+        updateCurve();
+        updateAxises();
+        updateTicks();
+        updateWeekday();
     }
 }
 
 template <typename input_type>
 void Graph<input_type>::dynamicCursor(int8_t step) {
+    _prev_index = _curr_index;
+    _curr_index += step;
+    _curr_index = constrain(_curr_index, CRECT_HALF, TFT_XMAX - L_EDGE - CRECT_HALF);
 
+    if (_prev_index != _curr_index) {
+        updateCursor();
+        if (abs(_prev_values[_prev_index] - BT_EDGE + UP_EDGE) <= CRECT_HALF) {
+            updateAxises(true);
+            updateTicks();
+        } else updateAxises();
+    }
 }
 
 template <typename input_type>
-void Graph<input_type>::annotate() {
-    
+void Graph<input_type>::annotate(bool dayscale) {
+    if (dayscale) {
+        updateWeekday(true);
+    }
 }
 
 template <typename input_type>
@@ -73,11 +87,9 @@ void Graph<input_type>::updateCurve(bool initial) {
     if (initial) {
         if (_curr_min >= 0) {
             memset(_prev_values, BT_EDGE - UP_EDGE - 1, sizeof(_prev_values));
-        }
-        else if (_curr_max <= 0) {
+        } else if (_curr_max <= 0) {
             memset(_prev_values, 1, sizeof(_prev_values));
-        }
-        else memset(_prev_values, _curr_level - UP_EDGE, sizeof(_prev_values));
+        } else memset(_prev_values, _curr_level - UP_EDGE, sizeof(_prev_values));
     }
 
     for (int16_t i = _curr_startp; i <= _curr_endp; i++) {
@@ -96,36 +108,30 @@ void Graph<input_type>::updateCurve(bool initial) {
         uint16_t primary_color, secondary_color;
         bool junction = false;
 
-        if (_curr_min >= 0) primary_color = (diff > 0) ? 0x0000 : PLOT_COLOR;
-        else if (_curr_max <= 0) primary_color = (diff > 0) ? PLOT_COLOR : 0x0000;
+        if (_curr_min >= 0) primary_color = (diff > 0) ? 0x0000 : PLOT_CLR;
+        else if (_curr_max <= 0) primary_color = (diff > 0) ? PLOT_CLR : 0x0000;
         else {
             if (diff > 0) {
                 if (h + UP_EDGE > _curr_level && h - diff + UP_EDGE >= _curr_level) {
-                    primary_color = PLOT_COLOR;
-                }
-                else if (h + UP_EDGE > _curr_level && h - diff + UP_EDGE < _curr_level) {
+                    primary_color = PLOT_CLR;
+                } else if (h + UP_EDGE > _curr_level && h - diff + UP_EDGE < _curr_level) {
                     junction = true;
-                    primary_color = PLOT_COLOR; secondary_color = 0x0000;
-                }
-                else primary_color = 0x0000;
-            }
-            else {
+                    primary_color = PLOT_CLR; secondary_color = 0x0000;
+                } else primary_color = 0x0000;
+            } else {
                 if (h + UP_EDGE >= _curr_level && h - diff + UP_EDGE > _curr_level) {
                     primary_color = 0x0000;
-                }
-                else if (h + UP_EDGE < _curr_level && h - diff + UP_EDGE > _curr_level) {
+                } else if (h + UP_EDGE < _curr_level && h - diff + UP_EDGE > _curr_level) {
                     junction = true;
-                    primary_color = PLOT_COLOR; secondary_color = 0x0000;
-                }
-                else primary_color = PLOT_COLOR;
+                    primary_color = PLOT_CLR; secondary_color = 0x0000;
+                } else primary_color = PLOT_CLR;
             }
         }
 
         if (junction) {
             _tft.drawFastVLine(x, UP_EDGE + h, _curr_level - h - UP_EDGE, primary_color);
             _tft.drawFastVLine(x, _curr_level, UP_EDGE + h - diff - _curr_level, secondary_color);
-        }
-        else _tft.drawFastVLine(x, UP_EDGE + h, -diff, primary_color);
+        } else _tft.drawFastVLine(x, UP_EDGE + h, -diff, primary_color);
 
         x++;
     }
@@ -133,53 +139,170 @@ void Graph<input_type>::updateCurve(bool initial) {
 
 template <typename input_type>
 void Graph<input_type>::updateAxises(bool initial) {
-    _tft.drawFastHLine(L_EDGE - TICK_LEN, _curr_level, TFT_XMAX - L_EDGE + TICK_LEN, AXIS_COLOR);
+    _tft.drawFastHLine(L_EDGE - TICK_LEN, _curr_level, TFT_XMAX - L_EDGE + TICK_LEN, AXIS_CLR);
 
     if (initial) {
-        _tft.drawFastVLine(L_EDGE - 1, UP_EDGE - TICK_LEN, BT_EDGE - UP_EDGE + TICK_LEN, AXIS_COLOR);
+        _tft.drawFastVLine(L_EDGE - 1, UP_EDGE - TICK_LEN, BT_EDGE - UP_EDGE + TICK_LEN, AXIS_CLR);
         if (_curr_level != BT_EDGE) {
-            _tft.drawFastHLine(L_EDGE - TICK_LEN, BT_EDGE, TFT_XMAX - L_EDGE + TICK_LEN, AXIS_COLOR);
+            _tft.drawFastHLine(L_EDGE - TICK_LEN, BT_EDGE, TFT_XMAX - L_EDGE + TICK_LEN, AXIS_CLR);
         }
     }
 }
 
 template <typename input_type>
 void Graph<input_type>::updateTicks(bool initial) {
-    _tft.setTextColor(TEXT_COLOR);
+    _tft.setTextColor(TEXT_CLR1);
+    _tft.setTextSize(1);
 
-    if (initial) memset(_tick_indexes, -1, sizeof(_tick_indexes));
+    if (initial) memset(_tick_posns, -1, sizeof(_tick_posns));
     else {
         for (uint8_t i = 0; i * TICK_PER < 24; i++) {
-            if (_tick_indexes[i] != -1 && _tick_indexes[i] < TFT_XMAX - 15) {
-                _tft.drawFastVLine(_tick_indexes[i], BT_EDGE + 1, TICK_LEN, 0x0000);
-                _tft.fillRect(_tick_indexes[i] - 14, BT_EDGE + 7, 31, 15, 0x0000);
-                _tick_indexes[i] = -1;
+            if (_tick_posns[i] != -1 && _tick_posns[i] < TFT_XMAX - 15) {
+                _tft.drawFastVLine(_tick_posns[i], BT_EDGE + 1, TICK_LEN, 0x0000);
+                _tft.fillRect(_tick_posns[i] - 14, BT_EDGE + 7, 31, 15, 0x0000);
+                _tick_posns[i] = -1;
             }
         }
     }
 
     for (uint8_t i = 0; i * TICK_PER < 24; i++) {
         uint8_t tick = i * TICK_PER;
-        int8_t min_diff = 31;
         for (uint16_t j = _curr_startp; j <= _curr_endp; j++) {
+            if (j == 0) continue;
             if (_data.getData()[j].hour == tick) {
-                int8_t diff = min((int8_t)_data.getData()[j].minute, int8_t(60 - _data.getData()[j].minute));
-                if (diff < min_diff) {
-                    min_diff = diff;
-                    _tick_indexes[i] = j - _curr_startp + L_EDGE;
-                }
+                int8_t diff = min((int8_t)_data.getData()[j].minute,
+                                  int8_t(60 - _data.getData()[j - 1].minute));
+                _tick_posns[i] = j - _curr_startp + L_EDGE;
+                if (diff != _data.getData()[j].minute) _tick_posns[i]--;
+                break;
             }
         }
-        if (_tick_indexes[i] != -1 && _tick_indexes[i] < TFT_XMAX - 15) {
+        if (_tick_posns[i] != -1 && _tick_posns[i] < TFT_XMAX - 15) {
             char hours[2];
-            _tft.drawFastVLine(_tick_indexes[i], BT_EDGE, TICK_LEN, TICK_COLOR);
+            _tft.drawFastVLine(_tick_posns[i], BT_EDGE, TICK_LEN, TICK_CLR);
             itoa(tick, hours, DEC);
-            _tft.setCursor(_tick_indexes[i] - 6 * strlen(hours) - 2, BT_EDGE + 7);
+            _tft.setCursor(_tick_posns[i] - 6 * strlen(hours) - 2, BT_EDGE + 7);
             _tft.print(hours);
-            _tft.setCursor(_tick_indexes[i] + 4, BT_EDGE + 7);
+            _tft.setCursor(_tick_posns[i] + 4, BT_EDGE + 7);
             _tft.print("00");
         }
     }
+}
+
+template <typename input_type>
+void Graph<input_type>::updateWeekday(bool initial) {
+    _tft.setTextColor(TEXT_CLR2);
+    _tft.setTextSize(2);
+
+    if (initial) {
+        _tft.fillRect(L_EDGE - 1, UP_EDGE - 14, TFT_XMAX - L_EDGE, 2, SEP_CLR);
+        _tft.drawFastVLine(L_EDGE - 1, 0, UP_EDGE - TICK_LEN, AXIS_CLR);
+    } else {
+        _tft.fillRect(_separtr_index, UP_EDGE - 15, 2, -SEP_LEN, 0x0000);
+        _tft.fillRect(_spot_posns[0], UP_EDGE - 40, 12 * _spot_lengths[0], 16, 0x0000);
+        _tft.fillRect(_spot_posns[1], UP_EDGE - 40, 12 * _spot_lengths[1], 16, 0x0000);
+    }
+
+    for (uint16_t i = _curr_startp; i <= _curr_endp; i++) {
+        if (i == 0) continue;
+        if (_data.getData()[i].weekday != _data.getData()[i - 1].weekday) {
+            _separtr_index = i - _curr_startp + L_EDGE;
+            break;
+        }
+    }
+
+    _tft.fillRect(_separtr_index, UP_EDGE - 15, 2, -SEP_LEN, SEP_CLR);
+    if (_separtr_index < TFT_XMAX - 45) {
+        _spot_lengths[0] = constrain((TFT_XMAX - _separtr_index) >> 4, 3,
+                                      strlen(_weekdays[_data.getData()[_curr_endp].weekday]));
+        _spot_posns[0] = ((_separtr_index + TFT_XMAX) >> 1) - ((12 * _spot_lengths[0]) >> 1);
+        _tft.setCursor(_spot_posns[0], UP_EDGE - 40);
+        _tft.write(_weekdays[_data.getData()[_curr_endp].weekday], _spot_lengths[0]);
+    }
+    if (_separtr_index > L_EDGE + 45) {
+        _spot_lengths[1] = constrain((_separtr_index - L_EDGE) >> 4, 3,
+                                      strlen(_weekdays[_data.getData()[_curr_startp].weekday]));
+        _spot_posns[1] = ((_separtr_index + L_EDGE) >> 1) - ((12 * _spot_lengths[1]) >> 1);
+        _tft.setCursor(_spot_posns[1], UP_EDGE - 40);
+        _tft.write(_weekdays[_data.getData()[_curr_startp].weekday], _spot_lengths[1]);
+    }
+}
+
+template <typename input_type>
+void Graph<input_type>::updateCursor(bool initial) {
+    if (!initial) {
+        int16_t x = L_EDGE + _prev_index - CRECT_HALF;
+        int16_t prev_val_lower = _prev_values[_prev_index] - CRECT_HALF;
+        int16_t prev_val_upper = _prev_values[_prev_index] + CRECT_HALF;
+        int16_t curr_relative_level = _curr_level - UP_EDGE;
+
+        for (uint16_t i = x - L_EDGE; i <= _prev_index + CRECT_HALF; i++) {
+            int16_t prev_val = _prev_values[i];
+            int16_t vline_start, vline_height;
+            uint16_t color = 0x0000;
+
+            if (prev_val_upper < curr_relative_level) {
+                if (prev_val_lower > prev_val) {
+                    vline_start = prev_val_lower + UP_EDGE - 1;
+                    vline_height = CRECT_SIDE + 1;
+                    color = PLOT_CLR;
+                } else if (prev_val_upper < prev_val) {
+                    vline_start = prev_val_lower + UP_EDGE - 1;
+                    vline_height = CRECT_SIDE + 1;
+                } else {
+                    _tft.drawFastVLine(x, prev_val + UP_EDGE, prev_val_upper - prev_val + 1, PLOT_CLR);
+                    _tft.drawFastVLine(x, prev_val + UP_EDGE, prev_val_lower - prev_val - 1, color);
+                    x++;
+                    continue;
+                }
+            } else if (prev_val_lower > curr_relative_level) {
+                if (prev_val_lower > prev_val) {
+                    vline_start = prev_val_lower + UP_EDGE - 1;
+                    vline_height = CRECT_SIDE + 1;
+                } else if (prev_val_upper < prev_val) {
+                    vline_start = prev_val_lower + UP_EDGE - 1;
+                    vline_height = CRECT_SIDE + 1;
+                    color = PLOT_CLR;
+                } else {
+                    _tft.drawFastVLine(x, prev_val + UP_EDGE, prev_val_upper - prev_val + 1, color);
+                    _tft.drawFastVLine(x, prev_val + UP_EDGE, prev_val_lower - prev_val - 1, PLOT_CLR);
+                    x++;
+                    continue;
+                }
+            } else {
+                int16_t temp = prev_val_lower + UP_EDGE;
+                if (prev_val_lower > prev_val) {
+                    _tft.drawFastVLine(x, temp - 1, _curr_level - temp + 1, PLOT_CLR);
+                    _tft.drawFastVLine(x, _curr_level, temp + 1 + CRECT_SIDE - _curr_level, color);
+                } else if (prev_val_upper < prev_val) {
+                    _tft.drawFastVLine(x, temp - 1, _curr_level - temp + 1, color);
+                    _tft.drawFastVLine(x, _curr_level, temp + 1 + CRECT_SIDE - _curr_level, PLOT_CLR);
+                } else if (prev_val <= curr_relative_level) {
+                    _tft.drawFastVLine(x, prev_val + UP_EDGE, curr_relative_level - prev_val, PLOT_CLR);
+                    _tft.drawFastVLine(x, prev_val + UP_EDGE, prev_val_lower - prev_val - 1, color);
+                    _tft.drawFastVLine(x, _curr_level, prev_val_upper - _curr_level + UP_EDGE + 1, color);
+                } else {
+                    _tft.drawFastVLine(x, prev_val + UP_EDGE, curr_relative_level - prev_val, PLOT_CLR);
+                    _tft.drawFastVLine(x, prev_val + UP_EDGE, prev_val_upper - prev_val + 1, color);
+                    _tft.drawFastVLine(x, _curr_level, prev_val_lower - _curr_level + UP_EDGE - 1, color);
+                }
+                x++;
+                continue;
+            }
+
+            _tft.drawFastVLine(x, vline_start, vline_height, color);
+            x++;
+        }
+    }
+
+    uint16_t cursor_x = _curr_index + L_EDGE;
+    uint16_t cursor_y = _prev_values[_curr_index] + UP_EDGE;
+    uint16_t rect_x = cursor_x - CRECT_HALF;
+    uint16_t rect_y = cursor_y - CRECT_HALF;
+    _tft.drawRect(rect_x, rect_y, CRECT_SIDE, CRECT_SIDE, CRSR_CLR);
+    _tft.drawRect(rect_x + 1, rect_y + 1, CRECT_SIDE - 2, CRECT_SIDE - 2, CRSR_CLR);
+    _tft.drawFastVLine(cursor_x, UP_EDGE - CRECT_HALF, BT_EDGE - UP_EDGE + CRECT_HALF, CRSR_CLR);
+    
 }
 
 template <typename input_type>

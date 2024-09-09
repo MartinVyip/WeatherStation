@@ -10,16 +10,15 @@ DataVault<input_type>::~DataVault() {
 }
 
 template <typename input_type>
-void DataVault<input_type>::appendValue(input_type value, uint8_t hour, uint8_t minute) {
+void DataVault<input_type>::appendValue(input_type value, uint8_t wday, uint8_t hour, uint8_t min) {
     if (_head_count < _buffer_size) {
-        _data[_head_count] = {value, 1, hour, minute};
+        _data[_head_count] = {value, wday, hour, min};
         _head_count++;
-    }
-    else {
+    } else {
         for (uint16_t i = 1; i < _buffer_size; i++) {
             _data[i - 1] = _data[i];
         }
-        _data[_buffer_size - 1] = {value, 1, hour, minute};
+        _data[_buffer_size - 1] = {value, wday, hour, min};
     }
 }
 
