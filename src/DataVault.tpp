@@ -49,3 +49,24 @@ template <typename input_type>
 uint16_t DataVault<input_type>::getHeadCount() const {
     return _head_count;
 }
+
+template <typename input_type>
+void DataVault<input_type>::getCharValue(input_type value, char* buffer) const {
+    if constexpr (std::is_floating_point<input_type>::value) {
+        int16_t int_part = static_cast<int>(value);
+        float frac_part = value - int_part;
+        int16_t round_frac = static_cast<int>(round(frac_part * 10));
+        if (abs(round_frac) >= 10) {
+            int_part = (round_frac > 0) ? ++int_part : --int_part;
+            round_frac = 0;
+        }
+        sprintf(buffer, "%d.%1d", int_part, abs(round_frac));
+    } else if constexpr (std::is_integral<input_type>::value) {
+        sprintf(buffer, "%d", value);
+    }
+}
+
+template <typename input_type>
+void DataVault<input_type>::getCharTime(uint16_t index, char* buffer) const {
+    sprintf(buffer, "%u:%02u", _data[index].hour, _data[index].minute);
+}

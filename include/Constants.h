@@ -4,11 +4,16 @@
 // ==================== SETTINGS ====================
 #define PAN_SLOW 20
 #define PAN_FAST 50
+#define CRSR_SLOW 1
+#define CRSR_FAST 10
 #define TICK_PER 6
 
 // ===================== COLORS =====================
 #define TEXT_CLR1 0xFC18  // ticks
 #define TEXT_CLR2 0xFC18  // weekdays
+#define TEXT_CLR3 0xFC18  // cursor
+#define TEXT_CLR4 0xFC18  // annotations
+#define LINK_CLR 0xFD20
 #define AXIS_CLR 0x7BE0
 #define TICK_CLR 0x7BE0
 #define SEP_CLR 0x03EF

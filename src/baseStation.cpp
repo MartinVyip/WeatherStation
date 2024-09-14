@@ -38,7 +38,7 @@ enum modes {
 enum screens {
     MAIN,
     OUT_TEMP, OUT_HUM, OUT_PRESS,
-    IN_PRESS, IN_HUM, IN_TEMP,
+    IN_TEMP, IN_HUM,
     CO2_RATE
 };
 
@@ -88,7 +88,13 @@ inline void hardwareSetup() {
 }
 
 DataVault <float> out_temp(1680);
-Graph <float> plot(out_temp, tft);
+DataVault <float> out_hum(1680);
+DataVault <uint16_t> out_press(1680);
+DataVault <float> in_temp(1680);
+DataVault <float> in_hum(1680);
+DataVault <uint16_t> co2_rate(1680);
+
+GraphBase* plot = nullptr;
 
 void setup() {
     hardwareSetup();
@@ -102,8 +108,19 @@ void setup() {
 
     for (int i = 0; i < numPoints; i++) {
         float angle = i * (2 * PI / numPoints);
-        float value = sin(angle * frequency) * (numPoints - i);
-        out_temp.appendValue(value, day, hour, minute);
+        float value1 = sin(angle * frequency) * (numPoints - i) / 20;
+        out_temp.appendValue(value1, day, hour, minute);
+        value1 = cos(angle * frequency) * (numPoints - i) / 20 - 90;
+        out_hum.appendValue(value1, day, hour, minute);
+        value1 = sin(angle * frequency * 2) * (numPoints - i) / 20 + 90;
+        in_temp.appendValue(value1, day, hour, minute);
+        value1 = sin(angle * frequency / 4) * (numPoints - i) / 20;
+        in_hum.appendValue(value1, day, hour, minute);
+
+        uint16_t value2 = sin(angle * frequency * 3) * (numPoints - i) / 3 + 1000;
+        out_press.appendValue(value2, day, hour, minute);
+        value2 = cos(angle * frequency) * (numPoints - i) + 2000;
+        co2_rate.appendValue(value2, day, hour, minute);
         minute += 6;
         if (minute >= 60) {
             minute = 0;
@@ -117,10 +134,6 @@ void setup() {
             }
         }
     }
-
-    plot.drawFresh();
-    //plot.annotate();
-    plot.drawCursor();
 }
 
 void loop() {
@@ -146,21 +159,40 @@ void loop() {
         rtc.setEpoch(unix_time);
     };
 
-    switch(curr_mode) {
+    switch (curr_mode) {
         case SCROLLING: {
             if (setup) {
                 setup = false;
+                if (curr_screen != MAIN) {
+                    switch (curr_screen) {
+                        case OUT_TEMP: plot = new Graph<float>(out_temp, tft); break;
+                        case OUT_HUM: plot = new Graph<float>(out_hum, tft); break;
+                        case OUT_PRESS: plot = new Graph<uint16_t>(out_press, tft); break;
+                        case IN_TEMP: plot = new Graph<float>(in_temp, tft); break;
+                        case IN_HUM: plot = new Graph<float>(in_hum, tft); break;
+                        case CO2_RATE: plot = new Graph<uint16_t>(co2_rate, tft); break;
+                    }
+                    plot->drawFresh();
+                    plot->annotate();
+                } else {
+                    tft.fillScreen(0x0000);
+                    tft.setCursor(0, 0);
+                    tft.print("main");
+                }
             }
 
-            if (enc.left()) {
-                curr_screen = (curr_screen > MAIN) ? (screens)(curr_screen - 1) : CO2_RATE;
-                setup = true;
-            } else if (enc.right()) {
-                curr_screen = (curr_screen < CO2_RATE) ? (screens)(curr_screen + 1) : MAIN;
+            if (enc.turn()) {
+                if (enc.left()) {
+                    curr_screen = (curr_screen > MAIN) ? (screens)(curr_screen - 1) : CO2_RATE;
+                } else if (enc.right()) {
+                    curr_screen = (curr_screen < CO2_RATE) ? (screens)(curr_screen + 1) : MAIN;
+                }
+                delete plot;
+                plot = nullptr;
                 setup = true;
             }
 
-            if (enc.release()) {
+            if (enc.click()) {
                 if (curr_screen != MAIN) {
                     curr_mode = PANNING;
                     setup = true;
@@ -171,49 +203,52 @@ void loop() {
         case PANNING: {
             if (setup) {
                 setup = false;
+                plot->drawLocal(false);
+                plot->annotate();
             }
 
             if (enc.turn()) {
-                enc.dir();
-                enc.fast();
+                int8_t step = ((enc.fast()) ? PAN_FAST : PAN_SLOW) * enc.dir();
+                plot->dynamicPan(step);
             }
 
-            if (enc.release()) {
+            if (enc.click()) {
                 curr_mode = CURSOR;
                 setup = true;
             }
             if (enc.hold()) {
                 while(enc.holding());
                 curr_mode = SCROLLING;
-                setup = true;
+                plot->drawLocal();
+                plot->annotate();
             }
         }
         break;
         case CURSOR: {
             if (setup) {
                 setup = false;
+                plot->drawLocal();
+                plot->annotate(false);
+                plot->drawCursor(true);
             }
 
             if (enc.turn()) {
-                enc.dir();
-                enc.fast();
+                int8_t step = ((enc.fast()) ? CRSR_FAST : CRSR_SLOW) * enc.dir();
+                plot->dynamicCursor(step);
             }
 
-            if (enc.release()) {
+            if (enc.click()) {
                 curr_mode = PANNING;
                 setup = true;
             }
             if (enc.hold()) {
                 while(enc.holding());
                 curr_mode = SCROLLING;
-                setup = true;
+                plot->drawLocal();
+                plot->annotate();
             }
         }
         break;
-    }
-    if (enc.turn()) {
-        int8_t step = ((enc.fast()) ? PAN_FAST : PAN_SLOW) * enc.dir();
-        plot.dynamicCursor(step >> 1);
     }
     //UART.printf("%02d.%02d.%02d  ", rtc.getDay(), rtc.getMonth(), rtc.getYear());
     //UART.printf("%02d:%02d:%02d\n", rtc.getHours(), rtc.getMinutes(), rtc.getSeconds());

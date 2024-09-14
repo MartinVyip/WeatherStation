@@ -22,8 +22,11 @@ public:
     void appendValue(input_type value, uint8_t wday, uint8_t hour, uint8_t min);
     input_type findSampleMax(uint16_t startpoint, uint16_t endpoint) const;
     input_type findSampleMin(uint16_t startpoint, uint16_t endpoint) const;
+
     const DataPoint<input_type>* getData() const;
     uint16_t getHeadCount() const;
+    void getCharValue(input_type value, char* buffer) const;
+    void getCharTime(uint16_t index, char* buffer) const;
 
 private:
     DataPoint<input_type>* _data;
