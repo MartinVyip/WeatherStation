@@ -9,6 +9,7 @@ public:
     virtual void dynamicPan(int8_t step) = 0;
     virtual void dynamicCursor(int8_t step) = 0;
     virtual void annotate(bool dayscale = true) = 0;
+    virtual void drawLogos(enum screens screen, bool high) = 0;
 
     virtual ~GraphBase() {}
 };

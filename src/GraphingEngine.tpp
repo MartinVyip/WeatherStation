@@ -69,16 +69,26 @@ void Graph<input_type>::annotate(bool dayscale) {
     _data.getCharValue(_curr_min, min);
     uint8_t max_len = strlen(max);
     uint8_t min_len = strlen(min);
-    _tft.setCursor(5, UP_EDGE + 7);
+    _tft.setCursor(5, UP_EDGE + 25);
     _tft.print(max);
-    _tft.setCursor(5, BT_EDGE - 25);
+    _tft.setCursor(5, BT_EDGE - 30);
     _tft.print(min);
 
-    _tft.drawFastHLine(L_EDGE - CRECT_HALF, UP_EDGE, TICK_LEN, LINK_CLR);
-    _tft.drawLine(6 + max_len * 12, UP_EDGE + 27, L_EDGE - CRECT_HALF, UP_EDGE, LINK_CLR);
-    _tft.drawLine(6 + min_len * 12, BT_EDGE - 5, L_EDGE - CRECT_HALF, BT_EDGE, LINK_CLR);
-    _tft.drawFastHLine(5, UP_EDGE + 27, 1 + max_len * 12, LINK_CLR);
-    _tft.drawFastHLine(5, BT_EDGE - 5, 1 + min_len * 12, LINK_CLR);
+    _tft.drawFastHLine(L_EDGE - 4, UP_EDGE, CRECT_HALF, LINK_CLR);
+    _tft.drawLine(6 + max_len * 12, UP_EDGE + 45, L_EDGE - 4, UP_EDGE, LINK_CLR);
+    _tft.drawLine(6 + min_len * 12, BT_EDGE - 10, L_EDGE - CRECT_HALF, BT_EDGE, LINK_CLR);
+    _tft.drawFastHLine(5, UP_EDGE + 45, 1 + max_len * 12, LINK_CLR);
+    _tft.drawFastHLine(5, BT_EDGE - 10, 1 + min_len * 12, LINK_CLR);
+}
+
+template <typename input_type>
+void Graph<input_type>::drawLogos(enum screens screen, bool high) {
+    if (high) {
+        _tft.drawRGBBitmap(5, 5, high_bitmaps[screen], 60, 60);
+    } else {
+        _tft.drawRGBBitmap(5, 5, low_bitmaps[screen], 60, 60);
+    }
+    _tft.drawRGBBitmap(10, 130, tal_tech, 50, 30);
 }
 
 template <typename input_type>

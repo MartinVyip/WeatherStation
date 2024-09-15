@@ -4,6 +4,8 @@
 #include <SoftwareSerial.h>
 
 #include <Constants.h>
+#include <Enums.h>
+#include <GraphingBase.h>
 #include <GraphingEngine.h>
 #include <DataVault.h>
 
@@ -28,19 +30,6 @@ RF24 radio(RF_CE, RF_CSN);
 MHZ19 co2;
 I2C_eeprom eeprom(0x50, &I2C);
 STM32RTC& rtc = STM32RTC::getInstance();
-
-enum modes {
-    SCROLLING,
-    PANNING,
-    CURSOR
-};
-
-enum screens {
-    MAIN,
-    OUT_TEMP, OUT_HUM, OUT_PRESS,
-    IN_TEMP, IN_HUM,
-    CO2_RATE
-};
 
 inline void tftSetup() {
     pinMode(TFT_LED, OUTPUT);
@@ -108,18 +97,29 @@ void setup() {
 
     for (int i = 0; i < numPoints; i++) {
         float angle = i * (2 * PI / numPoints);
-        float value1 = sin(angle * frequency) * (numPoints - i) / 20;
+
+        // Create unique value for out_temp using a mix of sine wave and sawtooth wave
+        float value1 = sin(angle * frequency) * (numPoints - i) / 25 + (fmod(i, 100) / 5.0) - 10;
         out_temp.appendValue(value1, day, hour, minute);
-        value1 = cos(angle * frequency) * (numPoints - i) / 20 - 90;
+
+        // out_hum with triangle wave
+        value1 = abs(fmod(i * 2, 200) - 100) / 10.0 - 40 + cos(angle * frequency) * 5;
         out_hum.appendValue(value1, day, hour, minute);
-        value1 = sin(angle * frequency * 2) * (numPoints - i) / 20 + 90;
+
+        // in_temp with sine + square wave combination
+        value1 = (sin(angle * frequency * 2) > 0 ? 1 : -1) * (numPoints - i) / 15 + sin(angle * frequency * 3) * 5 + 85;
         in_temp.appendValue(value1, day, hour, minute);
-        value1 = sin(angle * frequency / 4) * (numPoints - i) / 20;
+
+        // in_hum with a combination of triangle and sine wave
+        value1 = (abs(fmod(i * 3, 300) - 150) / 15.0) + sin(angle * frequency / 4) * 5;
         in_hum.appendValue(value1, day, hour, minute);
 
-        uint16_t value2 = sin(angle * frequency * 3) * (numPoints - i) / 3 + 1000;
+        // out_press with sawtooth wave + sine wave
+        uint16_t value2 = (fmod(i * 1.5, 300) / 1.5) + sin(angle * frequency * 3) * 15 + 990;
         out_press.appendValue(value2, day, hour, minute);
-        value2 = cos(angle * frequency) * (numPoints - i) + 2000;
+
+        // co2_rate with cosine + step function
+        value2 = ((i % 200 > 100) ? 100 : 0) + cos(angle * frequency) * (numPoints - i) + 1950 + i % 50;
         co2_rate.appendValue(value2, day, hour, minute);
         minute += 6;
         if (minute >= 60) {
@@ -157,12 +157,13 @@ void loop() {
                     (uint32_t)time_bytes[2] << 8 |
                     (uint32_t)time_bytes[3];
         rtc.setEpoch(unix_time);
-    };
+    }
 
     switch (curr_mode) {
         case SCROLLING: {
             if (setup) {
                 setup = false;
+                tft.fillScreen(0x0000);
                 if (curr_screen != MAIN) {
                     switch (curr_screen) {
                         case OUT_TEMP: plot = new Graph<float>(out_temp, tft); break;
@@ -173,11 +174,19 @@ void loop() {
                         case CO2_RATE: plot = new Graph<uint16_t>(co2_rate, tft); break;
                     }
                     plot->drawFresh();
+                    plot->drawLogos(curr_screen, true);
                     plot->annotate();
                 } else {
-                    tft.fillScreen(0x0000);
+                    tft.setTextColor(TEXT_CLR0);
+                    tft.setTextSize(1);
                     tft.setCursor(0, 0);
-                    tft.print("main");
+                    tft.printf("%02d.%02d.%02d  ", rtc.getDay(),
+                                                   rtc.getMonth(),
+                                                   rtc.getYear());
+                    tft.setCursor(0, 10);
+                    tft.printf("%02d:%02d:%02d\n", rtc.getHours(),
+                                                   rtc.getMinutes(),
+                                                   rtc.getSeconds());
                 }
             }
 
@@ -190,9 +199,7 @@ void loop() {
                 delete plot;
                 plot = nullptr;
                 setup = true;
-            }
-
-            if (enc.click()) {
+            } else if (enc.click()) {
                 if (curr_screen != MAIN) {
                     curr_mode = PANNING;
                     setup = true;
@@ -204,22 +211,21 @@ void loop() {
             if (setup) {
                 setup = false;
                 plot->drawLocal(false);
+                plot->drawLogos(curr_screen, true);
                 plot->annotate();
             }
 
             if (enc.turn()) {
                 int8_t step = ((enc.fast()) ? PAN_FAST : PAN_SLOW) * enc.dir();
                 plot->dynamicPan(step);
-            }
-
-            if (enc.click()) {
+            } else if (enc.click()) {
                 curr_mode = CURSOR;
                 setup = true;
-            }
-            if (enc.hold()) {
+            } else if (enc.hold()) {
                 while(enc.holding());
                 curr_mode = SCROLLING;
                 plot->drawLocal();
+                plot->drawLogos(curr_screen, true);
                 plot->annotate();
             }
         }
@@ -228,6 +234,7 @@ void loop() {
             if (setup) {
                 setup = false;
                 plot->drawLocal();
+                plot->drawLogos(curr_screen, true);
                 plot->annotate(false);
                 plot->drawCursor(true);
             }
@@ -235,21 +242,17 @@ void loop() {
             if (enc.turn()) {
                 int8_t step = ((enc.fast()) ? CRSR_FAST : CRSR_SLOW) * enc.dir();
                 plot->dynamicCursor(step);
-            }
-
-            if (enc.click()) {
+            } else if (enc.click()) {
                 curr_mode = PANNING;
                 setup = true;
-            }
-            if (enc.hold()) {
+            } else if (enc.hold()) {
                 while(enc.holding());
                 curr_mode = SCROLLING;
                 plot->drawLocal();
+                plot->drawLogos(curr_screen, true);
                 plot->annotate();
             }
         }
         break;
     }
-    //UART.printf("%02d.%02d.%02d  ", rtc.getDay(), rtc.getMonth(), rtc.getYear());
-    //UART.printf("%02d:%02d:%02d\n", rtc.getHours(), rtc.getMinutes(), rtc.getSeconds());
 }

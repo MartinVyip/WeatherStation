@@ -9,6 +9,7 @@
 #define TICK_PER 6
 
 // ===================== COLORS =====================
+#define TEXT_CLR0 0xFC18  // main screen
 #define TEXT_CLR1 0xFC18  // ticks
 #define TEXT_CLR2 0xFC18  // weekdays
 #define TEXT_CLR3 0xFC18  // cursor

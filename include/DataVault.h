@@ -20,6 +20,7 @@ public:
     ~DataVault();
 
     void appendValue(input_type value, uint8_t wday, uint8_t hour, uint8_t min);
+    input_type appendToAverage(input_type value);
     input_type findSampleMax(uint16_t startpoint, uint16_t endpoint) const;
     input_type findSampleMin(uint16_t startpoint, uint16_t endpoint) const;
 
@@ -30,8 +31,10 @@ public:
 
 private:
     DataPoint<input_type>* _data;
-    uint16_t _buffer_size;
-    uint16_t _head_count;
+
+    uint16_t _buffer_size, _head_count;
+    input_type _average_sum;
+    uint8_t _average_counter;
 };
 
 #include <DataVault.tpp>

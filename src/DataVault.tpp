@@ -20,6 +20,14 @@ void DataVault<input_type>::appendValue(input_type value, uint8_t wday, uint8_t 
         }
         _data[_buffer_size - 1] = {value, wday, hour, min};
     }
+    _average_counter = _average_sum = 0;
+}
+
+template <typename input_type>
+input_type DataVault<input_type>::appendToAverage(input_type value) {
+    _average_sum += value;
+    _average_counter++;
+    return (_average_sum / _average_counter);
 }
 
 template <typename input_type>

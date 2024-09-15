@@ -5,6 +5,8 @@
 #include <Adafruit_ILI9341.h>
 
 #include <Constants.h>
+#include <Enums.h>
+#include <Bitmaps.h>
 #include <DataVault.h>
 #include <GraphingBase.h>
 
@@ -20,6 +22,7 @@ public:
     void dynamicPan(int8_t step) override;
     void dynamicCursor(int8_t step) override;
     void annotate(bool dayscale = true) override;
+    void drawLogos(enum screens screen, bool high) override;
 
 private:
     DataVault<input_type>& _data;
