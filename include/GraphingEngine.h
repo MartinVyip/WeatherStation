@@ -5,7 +5,7 @@
 #include <Adafruit_ILI9341.h>
 
 #include <Constants.h>
-#include <Enums.h>
+#include <Enums&Structs.h>
 #include <Bitmaps.h>
 #include <DataVault.h>
 #include <GraphingBase.h>
@@ -44,7 +44,7 @@ private:
 
     // Weekday management
     const char _weekdays[7][12] = {
-        {'E', 's', 'm', 'a', 's', 'p', 0x85, 'e', 'v', '\0'},
+        {'E', 's', 'm', 'a', 's', 'p', 0x84, 'e', 'v', '\0'},
         {'T', 'e', 'i', 's', 'i', 'p', 0x84, 'e', 'v', '\0'},
         {'K', 'o', 'l', 'm', 'a', 'p', 0x84, 'e', 'v', '\0'},
         {'N', 'e', 'l', 'j', 'a', 'p', 0x84, 'e', 'v', '\0'},

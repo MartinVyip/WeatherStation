@@ -4,11 +4,12 @@
 #include <SoftwareSerial.h>
 
 #include <Constants.h>
-#include <Enums.h>
+#include <Enums&Structs.h>
 #include <GraphingBase.h>
 #include <GraphingEngine.h>
 #include <DataVault.h>
 
+#include <Fonts/FreeMonoBoldOblique12pt7b.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_ILI9341.h>
 #include <Adafruit_BME280.h>
@@ -76,6 +77,25 @@ inline void hardwareSetup() {
     enc.setFastTimeout(ENC_FAST_TIME);
 }
 
+template <typename input_type>
+void printValue(input_type value, const indicator& settings, bool initial) {
+    char output[15];
+    DataVault<input_type>::getCharValue(value, output);
+    strcat(output, settings.unit);
+
+    tft.setTextColor(TEXT_CLR0);
+    tft.setFont(settings.font);
+    tft.setCursor(settings.pos_x, settings.pos_y);
+
+    if (!initial) {
+        tft.fillRect(settings.bound_x, settings.bound_y,
+                     settings.bound_width, settings.bound_height, 0x0000);
+    }
+
+    tft.write(output);
+    tft.setFont();
+}
+
 DataVault <float> out_temp(1680);
 DataVault <float> out_hum(1680);
 DataVault <uint16_t> out_press(1680);
@@ -84,6 +104,11 @@ DataVault <float> in_hum(1680);
 DataVault <uint16_t> co2_rate(1680);
 
 GraphBase* plot = nullptr;
+
+const char degree_sym[] = {0xF8, 'C', '\0'};
+const indicator out_temp_ind = {0, 45, 30, 40, 50, 60,
+                                    &FreeMonoBoldOblique12pt7b, degree_sym};
+
 
 void setup() {
     hardwareSetup();
@@ -100,27 +125,33 @@ void setup() {
 
         // Create unique value for out_temp using a mix of sine wave and sawtooth wave
         float value1 = sin(angle * frequency) * (numPoints - i) / 25 + (fmod(i, 100) / 5.0) - 10;
-        out_temp.appendValue(value1, day, hour, minute);
+        out_temp.appendToAverage(value1);
+        out_temp.appendToVault(day, hour, minute);
 
         // out_hum with triangle wave
         value1 = abs(fmod(i * 2, 200) - 100) / 10.0 - 40 + cos(angle * frequency) * 5;
-        out_hum.appendValue(value1, day, hour, minute);
+        out_hum.appendToAverage(value1);
+        out_hum.appendToVault(day, hour, minute);
 
         // in_temp with sine + square wave combination
         value1 = (sin(angle * frequency * 2) > 0 ? 1 : -1) * (numPoints - i) / 15 + sin(angle * frequency * 3) * 5 + 85;
-        in_temp.appendValue(value1, day, hour, minute);
+        in_temp.appendToAverage(value1);
+        in_temp.appendToVault(day, hour, minute);
 
         // in_hum with a combination of triangle and sine wave
         value1 = (abs(fmod(i * 3, 300) - 150) / 15.0) + sin(angle * frequency / 4) * 5;
-        in_hum.appendValue(value1, day, hour, minute);
+        in_hum.appendToAverage(value1);
+        in_hum.appendToVault(day, hour, minute);
 
         // out_press with sawtooth wave + sine wave
         uint16_t value2 = (fmod(i * 1.5, 300) / 1.5) + sin(angle * frequency * 3) * 15 + 990;
-        out_press.appendValue(value2, day, hour, minute);
+        out_press.appendToAverage(value2);
+        out_press.appendToVault(day, hour, minute);
 
         // co2_rate with cosine + step function
         value2 = ((i % 200 > 100) ? 100 : 0) + cos(angle * frequency) * (numPoints - i) + 1950 + i % 50;
-        co2_rate.appendValue(value2, day, hour, minute);
+        co2_rate.appendToAverage(value2);
+        co2_rate.appendToVault(day, hour, minute);
         minute += 6;
         if (minute >= 60) {
             minute = 0;
@@ -140,12 +171,45 @@ void loop() {
     static modes curr_mode = SCROLLING;
     static screens curr_screen = MAIN;
     static bool setup = true;
+    static uint32_t last_upd_sens, last_apd_sens;
 
     enc.tick();
+    uint32_t curr_time = millis();
 
     if (radio.available()) {
         float received_data[3];
         radio.read(&received_data, sizeof(received_data));
+        out_temp.appendToAverage(received_data[0]);
+        out_hum.appendToAverage(received_data[1]);
+        out_press.appendToAverage(received_data[2]);
+        if (curr_screen == MAIN) {
+            
+        }
+    }
+
+    if (curr_time - last_upd_sens >= UPD_PER) {
+        in_temp.appendToAverage(bme.readTemperature());
+        in_hum.appendToAverage(bme.readHumidity());
+        co2_rate.appendToAverage(co2.getCO2());
+        if (curr_screen == MAIN) {
+
+        }
+        last_upd_sens = curr_time;
+    }
+
+    if (curr_time - last_apd_sens >= APD_PER) {
+        uint8_t weekday = rtc.getWeekDay();
+        uint8_t hour = rtc.getHours();
+        uint8_t minute = rtc.getMinutes();
+
+        out_temp.appendToVault(weekday, hour, minute);
+        out_hum.appendToVault(weekday, hour, minute);
+        out_press.appendToVault(weekday, hour, minute);
+        in_temp.appendToVault(weekday, hour, minute);
+        in_hum.appendToVault(weekday, hour, minute);
+        co2_rate.appendToVault(weekday, hour, minute);
+
+        last_apd_sens = curr_time;
     }
 
     if (UART.available()) {
@@ -187,6 +251,9 @@ void loop() {
                     tft.printf("%02d:%02d:%02d\n", rtc.getHours(),
                                                    rtc.getMinutes(),
                                                    rtc.getSeconds());
+                    printValue(bme.readTemperature(), out_temp_ind, true);
+                    //printValue(bme.readHumidity(), 50, 70, 2, "%", true);
+                    //printValue(co2.getCO2(), 75, 120, 3, "PPM", true);
                 }
             }
 

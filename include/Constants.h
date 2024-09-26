@@ -2,6 +2,8 @@
 #define Constants_h
 
 // ==================== SETTINGS ====================
+#define UPD_PER 30000
+#define APD_PER 360000
 #define PAN_SLOW 20
 #define PAN_FAST 50
 #define CRSR_SLOW 1
