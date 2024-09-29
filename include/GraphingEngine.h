@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <Adafruit_ILI9341.h>
+#include <fonts/CustomFont10pt.h>
 
 #include <Constants.h>
 #include <Enums&Structs.h>
@@ -24,6 +25,8 @@ public:
     void annotate(bool dayscale = true) override;
     void drawLogos(enum screens screen, bool high) override;
 
+    static uint16_t getTextWidth(const char* string, Adafruit_ILI9341& tft_reference);
+
 private:
     DataVault<input_type>& _data;
     Adafruit_ILI9341& _tft;
@@ -43,19 +46,10 @@ private:
     void updateTicks(bool initial = false);
 
     // Weekday management
-    const char _weekdays[7][12] = {
-        {'E', 's', 'm', 'a', 's', 'p', 0x84, 'e', 'v', '\0'},
-        {'T', 'e', 'i', 's', 'i', 'p', 0x84, 'e', 'v', '\0'},
-        {'K', 'o', 'l', 'm', 'a', 'p', 0x84, 'e', 'v', '\0'},
-        {'N', 'e', 'l', 'j', 'a', 'p', 0x84, 'e', 'v', '\0'},
-        {'R', 'e', 'e', 'd', 'e', '\0'},
-        {'L', 'a', 'u', 'p', 0x84, 'e', 'v', '\0'},
-        {'P', 0x81, 'h', 'a', 'p', 0x84, 'e', 'v', '\0'}
-    };
     uint16_t _separtr_index;
     uint16_t _spot_posns[2];
     uint8_t _spot_lengths[2];
-    void updateWeekday(bool initial = false);
+    void updateWeekdays(bool initial = false);
 
     // Cursor management
     int16_t _curr_index, _prev_index;

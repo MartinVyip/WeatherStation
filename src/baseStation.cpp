@@ -9,7 +9,6 @@
 #include <GraphingEngine.h>
 #include <DataVault.h>
 
-#include <Fonts/FreeMonoBoldOblique12pt7b.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_ILI9341.h>
 #include <Adafruit_BME280.h>
@@ -78,14 +77,29 @@ inline void hardwareSetup() {
 }
 
 template <typename input_type>
-void printValue(input_type value, const indicator& settings, bool initial) {
+void updateIndicator(input_type value, const indicator& settings, bool initial) {
     char output[15];
-    DataVault<input_type>::getCharValue(value, output);
-    strcat(output, settings.unit);
 
-    tft.setTextColor(TEXT_CLR0);
+    if constexpr (std::is_arithmetic<input_type>::value) {
+        DataVault<input_type>::getCharValue(value, output);
+        strcat(output, settings.unit);
+    } else {
+        strcpy(output, static_cast<const char*>(value));
+    }
+
+    tft.setTextColor(settings.color);
     tft.setFont(settings.font);
-    tft.setCursor(settings.pos_x, settings.pos_y);
+
+    if (settings.alignment == "left") {
+        tft.setCursor(settings.aln_x, settings.aln_y);
+    } else {
+        uint16_t width = Graph<input_type>::getTextWidth(output, tft);
+        if (settings.alignment == "right") {
+            tft.setCursor(settings.aln_x - width, settings.aln_y);
+        } else if (settings.alignment == "center") {
+            tft.setCursor(settings.aln_x - (width >> 1), settings.aln_y);
+        }
+    }
 
     if (!initial) {
         tft.fillRect(settings.bound_x, settings.bound_y,
@@ -93,7 +107,31 @@ void printValue(input_type value, const indicator& settings, bool initial) {
     }
 
     tft.write(output);
-    tft.setFont();
+}
+
+void updateTime(uint8_t minute) {
+    char timestring[5];
+    sprintf(timestring, "%02d:%02d", rtc.getHours(), minute);
+    updateIndicator(timestring, time_ind, false);
+}
+
+void updateDate() {
+    char datestring[10];
+    siprintf(datestring, "%02d.%02d.%d", rtc.getDay(), rtc.getMonth(), rtc.getYear());
+    updateIndicator(datestring, date_ind, false);
+}
+
+inline void buildMainScreen() {
+    tft.drawRoundRect(-12, 135, 197, 117, 12, SEP_CLR);
+    updateIndicator(99.92, out_temp_ind, true);
+    updateIndicator(99.92, out_hum_ind, true);
+    updateIndicator(999, out_press_ind, true);
+    updateIndicator(99.92, in_temp_ind, true);
+    updateIndicator(99.92, in_hum_ind, true);
+    updateIndicator(9999, co2_rate_ind, true);
+    updateTime(rtc.getMinutes());
+    updateDate();
+    updateIndicator(weekdays[rtc.getWeekDay() - 1], weekday_ind, true);
 }
 
 DataVault <float> out_temp(1680);
@@ -104,10 +142,6 @@ DataVault <float> in_hum(1680);
 DataVault <uint16_t> co2_rate(1680);
 
 GraphBase* plot = nullptr;
-
-const char degree_sym[] = {0xF8, 'C', '\0'};
-const indicator out_temp_ind = {0, 45, 30, 40, 50, 60,
-                                    &FreeMonoBoldOblique12pt7b, degree_sym};
 
 
 void setup() {
@@ -171,34 +205,14 @@ void loop() {
     static modes curr_mode = SCROLLING;
     static screens curr_screen = MAIN;
     static bool setup = true;
-    static uint32_t last_upd_sens, last_apd_sens;
+    static uint32_t prev_upd_sens, prev_apd_sens, prev_check;
+    static uint8_t curr_min, curr_weekday;
 
     enc.tick();
     uint32_t curr_time = millis();
 
-    if (radio.available()) {
-        float received_data[3];
-        radio.read(&received_data, sizeof(received_data));
-        out_temp.appendToAverage(received_data[0]);
-        out_hum.appendToAverage(received_data[1]);
-        out_press.appendToAverage(received_data[2]);
-        if (curr_screen == MAIN) {
-            
-        }
-    }
-
-    if (curr_time - last_upd_sens >= UPD_PER) {
-        in_temp.appendToAverage(bme.readTemperature());
-        in_hum.appendToAverage(bme.readHumidity());
-        co2_rate.appendToAverage(co2.getCO2());
-        if (curr_screen == MAIN) {
-
-        }
-        last_upd_sens = curr_time;
-    }
-
-    if (curr_time - last_apd_sens >= APD_PER) {
-        uint8_t weekday = rtc.getWeekDay();
+    if (curr_time - prev_apd_sens >= APD_PER) {
+        uint8_t weekday = rtc.getWeekDay() - 1;
         uint8_t hour = rtc.getHours();
         uint8_t minute = rtc.getMinutes();
 
@@ -209,7 +223,7 @@ void loop() {
         in_hum.appendToVault(weekday, hour, minute);
         co2_rate.appendToVault(weekday, hour, minute);
 
-        last_apd_sens = curr_time;
+        prev_apd_sens = curr_time;
     }
 
     if (UART.available()) {
@@ -241,19 +255,8 @@ void loop() {
                     plot->drawLogos(curr_screen, true);
                     plot->annotate();
                 } else {
-                    tft.setTextColor(TEXT_CLR0);
-                    tft.setTextSize(1);
-                    tft.setCursor(0, 0);
-                    tft.printf("%02d.%02d.%02d  ", rtc.getDay(),
-                                                   rtc.getMonth(),
-                                                   rtc.getYear());
-                    tft.setCursor(0, 10);
-                    tft.printf("%02d:%02d:%02d\n", rtc.getHours(),
-                                                   rtc.getMinutes(),
-                                                   rtc.getSeconds());
-                    printValue(bme.readTemperature(), out_temp_ind, true);
-                    //printValue(bme.readHumidity(), 50, 70, 2, "%", true);
-                    //printValue(co2.getCO2(), 75, 120, 3, "PPM", true);
+                    buildMainScreen();
+                    prev_check = curr_time;
                 }
             }
 
@@ -265,6 +268,7 @@ void loop() {
                 }
                 delete plot;
                 plot = nullptr;
+                prev_check = curr_time;
                 setup = true;
             } else if (enc.click()) {
                 if (curr_screen != MAIN) {
@@ -321,5 +325,41 @@ void loop() {
             }
         }
         break;
+    }
+
+    if (radio.available()) {
+        float received_data[3];
+        radio.read(&received_data, sizeof(received_data));
+        out_temp.appendToAverage(received_data[0]);
+        out_hum.appendToAverage(received_data[1]);
+        uint16_t pressure = round(received_data[2] * 0.00750062);
+        out_press.appendToAverage(pressure);
+        if (curr_screen == MAIN) {
+            
+        }
+    }
+
+    if (curr_time - prev_upd_sens >= UPD_PER) {
+        in_temp.appendToAverage(bme.readTemperature());
+        in_hum.appendToAverage(bme.readHumidity());
+        co2_rate.appendToAverage(co2.getCO2());
+        if (curr_screen == MAIN) {
+
+        }
+        prev_upd_sens = curr_time;
+    }
+
+    if (curr_screen == MAIN && curr_time - prev_check >= CHECK_PER) {
+        uint8_t minute = rtc.getMinutes();
+        if (minute != curr_min) {
+            curr_min = minute;
+            updateTime(minute);
+            uint8_t weekday = rtc.getWeekDay() - 1;
+            if (weekday != curr_weekday) {
+                curr_weekday = weekday;
+                updateDate();
+                updateIndicator(weekdays[weekday], weekday_ind, false);
+            }
+        }
     }
 }

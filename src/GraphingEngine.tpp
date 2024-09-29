@@ -36,7 +36,7 @@ void Graph<input_type>::dynamicPan(int8_t step) {
         updateCurve();
         updateAxises();
         updateTicks();
-        updateWeekday();
+        updateWeekdays();
     }
 }
 
@@ -59,26 +59,28 @@ void Graph<input_type>::dynamicCursor(int8_t step) {
 template <typename input_type>
 void Graph<input_type>::annotate(bool dayscale) {
     if (dayscale) {
-        updateWeekday(true);
+        updateWeekdays(true);
     }
     _tft.setTextColor(TEXT_CLR4);
-    _tft.setTextSize(2);
-    char max[10], min[10];
+    _tft.setTextSize(1);
+    _tft.setFont(&CustomFont10pt);
 
+    char max[10], min[10];
     _data.getCharValue(_curr_max, max);
     _data.getCharValue(_curr_min, min);
-    uint8_t max_len = strlen(max);
-    uint8_t min_len = strlen(min);
-    _tft.setCursor(5, UP_EDGE + 25);
+    _tft.setCursor(5, UP_EDGE + 40);
     _tft.print(max);
-    _tft.setCursor(5, BT_EDGE - 30);
+    _tft.setCursor(5, BT_EDGE - 15);
     _tft.print(min);
 
+    uint16_t width = getTextWidth(max, _tft);
     _tft.drawFastHLine(L_EDGE - 4, UP_EDGE, CRECT_HALF, LINK_CLR);
-    _tft.drawLine(6 + max_len * 12, UP_EDGE + 45, L_EDGE - 4, UP_EDGE, LINK_CLR);
-    _tft.drawLine(6 + min_len * 12, BT_EDGE - 10, L_EDGE - CRECT_HALF, BT_EDGE, LINK_CLR);
-    _tft.drawFastHLine(5, UP_EDGE + 45, 1 + max_len * 12, LINK_CLR);
-    _tft.drawFastHLine(5, BT_EDGE - 10, 1 + min_len * 12, LINK_CLR);
+    _tft.drawFastHLine(5, UP_EDGE + 45, 2 + width, LINK_CLR);
+    _tft.drawLine(7 + width, UP_EDGE + 45, L_EDGE - 4, UP_EDGE, LINK_CLR);
+
+    width = getTextWidth(min, _tft);
+    _tft.drawLine(7 + width, BT_EDGE - 10, L_EDGE - CRECT_HALF, BT_EDGE, LINK_CLR);
+    _tft.drawFastHLine(5, BT_EDGE - 10, 2 + width, LINK_CLR);
 }
 
 template <typename input_type>
@@ -184,6 +186,7 @@ template <typename input_type>
 void Graph<input_type>::updateTicks(bool initial) {
     _tft.setTextColor(TEXT_CLR1);
     _tft.setTextSize(1);
+    _tft.setFont();
 
     if (initial) memset(_tick_posns, -1, sizeof(_tick_posns));
     else {
@@ -221,17 +224,18 @@ void Graph<input_type>::updateTicks(bool initial) {
 }
 
 template <typename input_type>
-void Graph<input_type>::updateWeekday(bool initial) {
+void Graph<input_type>::updateWeekdays(bool initial) {
     _tft.setTextColor(TEXT_CLR2);
-    _tft.setTextSize(2);
+    _tft.setTextSize(1);
+    _tft.setFont(&CustomFont10pt);
 
     if (initial) {
         _tft.fillRect(L_EDGE - 1, UP_EDGE - 14, TFT_XMAX - L_EDGE, 2, SEP_CLR);
         _tft.drawFastVLine(L_EDGE - 1, 0, UP_EDGE - TICK_LEN, AXIS_CLR);
     } else {
         _tft.fillRect(_separtr_index, UP_EDGE - 15, 2, -SEP_LEN, 0x0000);
-        _tft.fillRect(_spot_posns[0], UP_EDGE - 40, 12 * _spot_lengths[0], 16, 0x0000);
-        _tft.fillRect(_spot_posns[1], UP_EDGE - 40, 12 * _spot_lengths[1], 16, 0x0000);
+        _tft.fillRect(_spot_posns[0], UP_EDGE - 40, 19 * _spot_lengths[0], 20, 0x0000);
+        _tft.fillRect(_spot_posns[1], UP_EDGE - 40, 19 * _spot_lengths[1], 20, 0x0000);
     }
 
     for (uint16_t i = _curr_startp; i <= _curr_endp; i++) {
@@ -243,19 +247,21 @@ void Graph<input_type>::updateWeekday(bool initial) {
     }
 
     _tft.fillRect(_separtr_index, UP_EDGE - 15, 2, -SEP_LEN, SEP_CLR);
-    if (_separtr_index < TFT_XMAX - 45) {
-        _spot_lengths[0] = constrain((TFT_XMAX - _separtr_index) >> 4, 3,
-                                      strlen(_weekdays[_data.getData()[_curr_endp].weekday]));
-        _spot_posns[0] = ((_separtr_index + TFT_XMAX) >> 1) - ((12 * _spot_lengths[0]) >> 1);
-        _tft.setCursor(_spot_posns[0], UP_EDGE - 40);
-        _tft.write(_weekdays[_data.getData()[_curr_endp].weekday], _spot_lengths[0]);
+    if (_separtr_index < TFT_XMAX - 60) {
+        _spot_lengths[0] = constrain((TFT_XMAX - _separtr_index) / 25, 3,
+                                      strlen(weekdays[_data.getData()[_curr_endp].weekday]));
+        _spot_posns[0] = ((_separtr_index + TFT_XMAX) >> 1) - ((16 * _spot_lengths[0]) >> 1);
+        _spot_posns[0] = constrain(_spot_posns[0], L_EDGE, TFT_XMAX);
+        _tft.setCursor(_spot_posns[0], UP_EDGE - 25);
+        _tft.write(weekdays[_data.getData()[_curr_endp].weekday], _spot_lengths[0]);
     }
-    if (_separtr_index > L_EDGE + 45) {
-        _spot_lengths[1] = constrain((_separtr_index - L_EDGE) >> 4, 3,
-                                      strlen(_weekdays[_data.getData()[_curr_startp].weekday]));
-        _spot_posns[1] = ((_separtr_index + L_EDGE) >> 1) - ((12 * _spot_lengths[1]) >> 1);
-        _tft.setCursor(_spot_posns[1], UP_EDGE - 40);
-        _tft.write(_weekdays[_data.getData()[_curr_startp].weekday], _spot_lengths[1]);
+    if (_separtr_index > L_EDGE + 60) {
+        _spot_lengths[1] = constrain((_separtr_index - L_EDGE) / 25, 3,
+                                      strlen(weekdays[_data.getData()[_curr_startp].weekday]));
+        _spot_posns[1] = ((_separtr_index + L_EDGE) >> 1) - ((16 * _spot_lengths[1]) >> 1);
+        _spot_posns[1] = constrain(_spot_posns[1], L_EDGE, TFT_XMAX);
+        _tft.setCursor(_spot_posns[1], UP_EDGE - 25);
+        _tft.write(weekdays[_data.getData()[_curr_startp].weekday], _spot_lengths[1]);
     }
 }
 
@@ -293,6 +299,7 @@ void Graph<input_type>::drawCursorData() {
 
     _tft.setTextColor(TEXT_CLR3);
     _tft.setTextSize(1);
+    _tft.setFont();
     _tft.setCursor(_cursor_x - 3 * time_len, 10);
     _tft.print(time);
     _tft.setCursor(_cursor_x - 3 * value_len, 22);
@@ -411,4 +418,12 @@ void Graph<input_type>::findAxisLevel() {
 template <typename input_type>
 float Graph<input_type>::mapFloat(float x, float in_min, float in_max, float out_min, float out_max) {
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
+template <typename input_type>
+uint16_t Graph<input_type>::getTextWidth(const char* string, Adafruit_ILI9341& tft_reference) {
+    int16_t x1, y1;
+    uint16_t h, width;
+    tft_reference.getTextBounds(string, 0, 0, &x1, &y1, &width, &h);
+    return width;
 }

@@ -17,12 +17,14 @@ enum screens {
 };
 
 struct indicator {
-    uint16_t pos_x;
-    uint16_t pos_y;
-    uint16_t bound_x;
-    uint16_t bound_y;
-    uint16_t bound_width;
-    uint16_t bound_height;
+    const char* alignment;
+    const uint16_t aln_x;
+    const uint16_t aln_y;
+    const uint16_t bound_x;
+    const uint16_t bound_y;
+    const uint16_t bound_width;
+    const uint16_t bound_height;
+    const uint16_t color;
     const GFXfont* font;
     const char* unit;
 };
