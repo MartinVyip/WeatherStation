@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 
-#include <Constants.h>
+#include <rsc/Constants.h>
 
 template <typename input_type>
 struct DataPoint {

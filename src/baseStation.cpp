@@ -3,8 +3,8 @@
 #include <Wire.h>
 #include <SoftwareSerial.h>
 
-#include <Constants.h>
-#include <Enums&Structs.h>
+#include <rsc/Constants.h>
+#include <rsc/Enums&Structs.h>
 #include <GraphingBase.h>
 #include <GraphingEngine.h>
 #include <DataVault.h>
@@ -123,6 +123,7 @@ void updateDate() {
 
 inline void buildMainScreen() {
     tft.drawRoundRect(-12, 135, 197, 117, 12, SEP_CLR);
+    tft.drawRGBBitmap(192, 120, indoor_ind, 120, 40);
     updateIndicator(99.92, out_temp_ind, true);
     updateIndicator(99.92, out_hum_ind, true);
     updateIndicator(999, out_press_ind, true);
@@ -344,7 +345,7 @@ void loop() {
         in_hum.appendToAverage(bme.readHumidity());
         co2_rate.appendToAverage(co2.getCO2());
         if (curr_screen == MAIN) {
-
+            
         }
         prev_upd_sens = curr_time;
     }

@@ -3,11 +3,10 @@
 
 #include <Arduino.h>
 #include <Adafruit_ILI9341.h>
-#include <fonts/CustomFont10pt.h>
 
-#include <Constants.h>
-#include <Enums&Structs.h>
-#include <Bitmaps.h>
+#include <rsc/Constants.h>
+#include <rsc/Enums&Structs.h>
+#include <rsc/Bitmaps.h>
 #include <DataVault.h>
 #include <GraphingBase.h>
 

@@ -1,11 +1,11 @@
 #ifndef Constants_h
 #define Constants_h
 
-#include <fonts/CustomFont10pt.h>
-#include <fonts/CustomFont12pt.h>
-#include <fonts/CustomFont18pt.h>
-#include <fonts/CustomFont24pt.h>
-#include <Enums&Structs.h>
+#include <rsc/fonts/CustomFont10pt.h>
+#include <rsc/fonts/CustomFont12pt.h>
+#include <rsc/fonts/CustomFont18pt.h>
+#include <rsc/fonts/CustomFont24pt.h>
+#include <rsc/Enums&Structs.h>
 
 // ==================== SETTINGS ====================
 #define UPD_PER 30000
@@ -85,9 +85,9 @@ const indicator co2_rate_ind = {"center", 252, 230, 188, 216, 128, 14, 0x2D6A,
                                 &CustomFont10pt, " PPM"};
 const indicator time_ind = {"center", 90, 180, 5, 146, 170, 35, 0xFE5C,
                             &CustomFont24pt, ""};
-const indicator weekday_ind = {"center", 90, 210, 0, 0, 0, 0, 0xFE5C,
-                            &CustomFont10pt, ""};
-const indicator date_ind = {"center", 90, 232, 0, 0, 0, 0, 0xFE5C,
+const indicator weekday_ind = {"center", 90, 210, 10, 194, 160, 16, 0xFE5C,
+                               &CustomFont10pt, ""};
+const indicator date_ind = {"center", 90, 232, 36, 218, 108, 14, 0xFE5C,
                             &CustomFont10pt, ""};
 
 const char weekdays[7][12] = {
