@@ -1067,11 +1067,11 @@ const GFXglyph CustomFont24ptGlyphs[] PROGMEM = {
   { 11472,   4,  43,  14,    5,  -38 },   // 0x7C '|'
   { 11494,  11,  43,  16,    2,  -38 },   // 0x7D '}'
   { 11554,  27,   7,  33,    3,  -20 },   // 0x7E '~'
-  { 11578,  12,  12,  33,   21,  -35 }    // 0x7F '°'
+  { 11578,  12,  12,  25,   13,  -35 }    // 0x7F '°'
 };
 
 const GFXfont CustomFont24pt PROGMEM = {
-  (uint8_t  *)CustomFont24ptBitmaps, 
-  (GFXglyph *)CustomFont24ptGlyphs, 0x20, 0x7F,  56 };
+  (uint8_t  *)CustomFont24ptBitmaps,  
+  (GFXglyph *)CustomFont24ptGlyphs, 0x20, 0x7F,   56 };
 
 // Approx. 12250 bytes

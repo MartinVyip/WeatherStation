@@ -84,13 +84,16 @@ void Graph<input_type>::annotate(bool dayscale) {
 }
 
 template <typename input_type>
-void Graph<input_type>::drawLogos(enum screens screen, bool high) {
-    if (high) {
-        _tft.drawRGBBitmap(5, 5, high_bitmaps[screen], 60, 60);
+void Graph<input_type>::drawLogos(enum screens screen, bool summertemp) {
+    if (summertemp) {
+        _tft.drawRGBBitmap(graph_icon.x, graph_icon.y,
+                           summer_graph_icons[screen], graph_icon.width, graph_icon.height);
     } else {
-        _tft.drawRGBBitmap(5, 5, low_bitmaps[screen], 60, 60);
+        _tft.drawRGBBitmap(graph_icon.x, graph_icon.y,
+                           winter_graph_icons[screen], graph_icon.width, graph_icon.height);
     }
-    _tft.drawRGBBitmap(10, 130, tal_tech, 50, 30);
+    _tft.drawRGBBitmap(tech_icon.x, tech_icon.y,
+                       tal_tech, tech_icon.width, tech_icon.height);
 }
 
 template <typename input_type>

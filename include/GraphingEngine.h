@@ -5,8 +5,6 @@
 #include <Adafruit_ILI9341.h>
 
 #include <rsc/Constants.h>
-#include <rsc/Enums&Structs.h>
-#include <rsc/Bitmaps.h>
 #include <DataVault.h>
 #include <GraphingBase.h>
 

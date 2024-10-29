@@ -4,10 +4,10 @@
 #include <SoftwareSerial.h>
 
 #include <rsc/Constants.h>
-#include <rsc/Enums&Structs.h>
 #include <GraphingBase.h>
 #include <GraphingEngine.h>
 #include <DataVault.h>
+#include <SolarWeatherUtils.h>
 
 #include <Adafruit_GFX.h>
 #include <Adafruit_ILI9341.h>
@@ -30,6 +30,14 @@ RF24 radio(RF_CE, RF_CSN);
 MHZ19 co2;
 I2C_eeprom eeprom(0x50, &I2C);
 STM32RTC& rtc = STM32RTC::getInstance();
+
+DataVault <float> out_temp(DATA_PNTS_AMT, TEMP_NORM_RANGE);
+DataVault <float> out_hum(DATA_PNTS_AMT, HUM_NORM_RANGE);
+DataVault <uint16_t> out_press(DATA_PNTS_AMT, PRESS_NORM_RANGE);
+DataVault <float> in_temp(DATA_PNTS_AMT);
+DataVault <float> in_hum(DATA_PNTS_AMT);
+DataVault <uint16_t> co2_rate(DATA_PNTS_AMT);
+GraphBase* plot = nullptr;
 
 inline void tftSetup() {
     pinMode(TFT_LED, OUTPUT);
@@ -77,7 +85,7 @@ inline void hardwareSetup() {
 }
 
 template <typename input_type>
-void updateIndicator(input_type value, const indicator& settings, bool initial) {
+void updateIndicator(input_type value, const indicator_config& settings, bool initial) {
     char output[15];
 
     if constexpr (std::is_arithmetic<input_type>::value) {
@@ -117,32 +125,64 @@ void updateTime(uint8_t minute) {
 
 void updateDate() {
     char datestring[10];
-    siprintf(datestring, "%02d.%02d.%d", rtc.getDay(), rtc.getMonth(), rtc.getYear());
+    sprintf(datestring, "%02d.%02d.%d", rtc.getDay(), rtc.getMonth(), rtc.getYear());
     updateIndicator(datestring, date_ind, false);
 }
 
-inline void buildMainScreen() {
-    tft.drawRoundRect(-12, 135, 197, 117, 12, SEP_CLR);
-    tft.drawRGBBitmap(192, 120, indoor_ind, 120, 40);
-    updateIndicator(99.92, out_temp_ind, true);
-    updateIndicator(99.92, out_hum_ind, true);
-    updateIndicator(999, out_press_ind, true);
-    updateIndicator(99.92, in_temp_ind, true);
-    updateIndicator(99.92, in_hum_ind, true);
-    updateIndicator(9999, co2_rate_ind, true);
-    updateTime(rtc.getMinutes());
-    updateDate();
-    updateIndicator(weekdays[rtc.getWeekDay() - 1], weekday_ind, true);
+void updateWeatherIcon(int8_t weather_rating, bool daytime, bool summertemp, bool initial) {
+    if (!initial && (weather_rating >= positive_weathers[3].min_rating ||
+        weather_rating <= negative_weathers[0].max_rating)) {
+        tft.fillRect(weather_icon.x, weather_icon.y,
+                     weather_icon.width, weather_icon.height, 0x0000);
+    }
+
+    if (weather_rating >= 0) {
+        for (const auto& config : positive_weathers) {
+            if (weather_rating >= config.min_rating && weather_rating <= config.max_rating) {
+                const icon_config& optimal = daytime ? config.option1 : config.option2;
+                tft.drawRGBBitmap(optimal.x, optimal.y, optimal.bitmap, optimal.width, optimal.height);
+                break;
+            }
+        }
+    } else {
+        for (const auto& config : negative_weathers) {
+            if (weather_rating >= config.min_rating && weather_rating <= config.max_rating) {
+                const icon_config& optimal = summertemp ? config.option1 : config.option2;
+                tft.drawRGBBitmap(optimal.x, optimal.y, optimal.bitmap, optimal.width, optimal.height);
+                break;
+            }
+        }
+    }
 }
 
-DataVault <float> out_temp(1680);
-DataVault <float> out_hum(1680);
-DataVault <uint16_t> out_press(1680);
-DataVault <float> in_temp(1680);
-DataVault <float> in_hum(1680);
-DataVault <uint16_t> co2_rate(1680);
+void adjustDST(uint8_t month, uint8_t day, uint8_t weekday, uint8_t hour) {
+    if (day >= 25 && weekday == 7) {
+        if (month == 3 && hour == 3) {
+            rtc.setHours(hour + 1);
+        } else if (month == 10 && hour == 4) {
+            rtc.setHours(hour - 1);
+        }
+    }
+}
 
-GraphBase* plot = nullptr;
+inline void buildMainScreen(bool daytime, bool summertemp) {
+    tft.drawRGBBitmap(indoor_icon.x, indoor_icon.y,
+                      indoor_ind, indoor_icon.width, indoor_icon.height);
+    updateIndicator(out_temp.getLastValue(), out_temp_ind, true);
+    updateIndicator(out_hum.getLastValue(), out_hum_ind, true);
+    updateIndicator(out_press.getLastValue(), out_press_ind, true);
+    updateIndicator(bme.readTemperature(), in_temp_ind, true);
+    updateIndicator(bme.readHumidity(), in_hum_ind, true);
+    updateIndicator(co2.getCO2(), co2_rate_ind, true);
+    updateIndicator(weekdays[rtc.getWeekDay() - 1], weekday_ind, true);
+    int8_t rate = findWeatherRating(out_press.findNormalizedTrendSlope(BACKSTEP_PER),
+                                    out_hum.findNormalizedTrendSlope(BACKSTEP_PER),
+                                    out_temp.findNormalizedTrendSlope(BACKSTEP_PER)
+                                    );
+    updateWeatherIcon(rate, daytime, summertemp, true);
+    updateTime(rtc.getMinutes());
+    updateDate();
+}
 
 
 void setup() {
@@ -179,7 +219,7 @@ void setup() {
         in_hum.appendToVault(day, hour, minute);
 
         // out_press with sawtooth wave + sine wave
-        uint16_t value2 = (fmod(i * 1.5, 300) / 1.5) + sin(angle * frequency * 3) * 15 + 990;
+        uint16_t value2 = sin(angle * frequency * 3) * 15 + 760;
         out_press.appendToAverage(value2);
         out_press.appendToVault(day, hour, minute);
 
@@ -202,17 +242,20 @@ void setup() {
     }
 }
 
+
 void loop() {
     static modes curr_mode = SCROLLING;
     static screens curr_screen = MAIN;
-    static bool setup = true;
+    static bool daytime, summertemp, setup = true;
     static uint32_t prev_upd_sens, prev_apd_sens, prev_check;
+    static uint16_t sunset, sunrise;
     static uint8_t curr_min, curr_weekday;
 
     enc.tick();
     uint32_t curr_time = millis();
 
     if (curr_time - prev_apd_sens >= APD_PER) {
+        prev_apd_sens = curr_time;
         uint8_t weekday = rtc.getWeekDay() - 1;
         uint8_t hour = rtc.getHours();
         uint8_t minute = rtc.getMinutes();
@@ -224,7 +267,13 @@ void loop() {
         in_hum.appendToVault(weekday, hour, minute);
         co2_rate.appendToVault(weekday, hour, minute);
 
-        prev_apd_sens = curr_time;
+        if (curr_screen == MAIN) {
+            int8_t rate = findWeatherRating(out_press.findNormalizedTrendSlope(BACKSTEP_PER),
+                                            out_hum.findNormalizedTrendSlope(BACKSTEP_PER),
+                                            out_temp.findNormalizedTrendSlope(BACKSTEP_PER)
+                                            );
+            updateWeatherIcon(rate, daytime, summertemp, false);
+        }
     }
 
     if (UART.available()) {
@@ -253,10 +302,10 @@ void loop() {
                         case CO2_RATE: plot = new Graph<uint16_t>(co2_rate, tft); break;
                     }
                     plot->drawFresh();
-                    plot->drawLogos(curr_screen, true);
+                    plot->drawLogos(curr_screen, summertemp);
                     plot->annotate();
                 } else {
-                    buildMainScreen();
+                    buildMainScreen(daytime, summertemp);
                     prev_check = curr_time;
                 }
             }
@@ -283,7 +332,7 @@ void loop() {
             if (setup) {
                 setup = false;
                 plot->drawLocal(false);
-                plot->drawLogos(curr_screen, true);
+                plot->drawLogos(curr_screen, summertemp);
                 plot->annotate();
             }
 
@@ -297,7 +346,7 @@ void loop() {
                 while(enc.holding());
                 curr_mode = SCROLLING;
                 plot->drawLocal();
-                plot->drawLogos(curr_screen, true);
+                plot->drawLogos(curr_screen, summertemp);
                 plot->annotate();
             }
         }
@@ -306,7 +355,7 @@ void loop() {
             if (setup) {
                 setup = false;
                 plot->drawLocal();
-                plot->drawLogos(curr_screen, true);
+                plot->drawLogos(curr_screen, summertemp);
                 plot->annotate(false);
                 plot->drawCursor(true);
             }
@@ -321,7 +370,7 @@ void loop() {
                 while(enc.holding());
                 curr_mode = SCROLLING;
                 plot->drawLocal();
-                plot->drawLogos(curr_screen, true);
+                plot->drawLogos(curr_screen, summertemp);
                 plot->annotate();
             }
         }
@@ -333,33 +382,50 @@ void loop() {
         radio.read(&received_data, sizeof(received_data));
         out_temp.appendToAverage(received_data[0]);
         out_hum.appendToAverage(received_data[1]);
-        uint16_t pressure = round(received_data[2] * 0.00750062);
-        out_press.appendToAverage(pressure);
+        out_press.appendToAverage(toMmHg(received_data[2]));
+
+        adjustSummertemp(&summertemp, received_data[0]);
         if (curr_screen == MAIN) {
-            
+            updateIndicator(received_data[0], out_temp_ind, false);
+            updateIndicator(received_data[1], out_hum_ind, false);
+            updateIndicator(toMmHg(received_data[2]), out_press_ind, false);
         }
     }
 
     if (curr_time - prev_upd_sens >= UPD_PER) {
-        in_temp.appendToAverage(bme.readTemperature());
-        in_hum.appendToAverage(bme.readHumidity());
-        co2_rate.appendToAverage(co2.getCO2());
-        if (curr_screen == MAIN) {
-            
-        }
         prev_upd_sens = curr_time;
+        float temp = bme.readTemperature();
+        float hum = bme.readHumidity();
+        uint16_t ppm = co2.getCO2();
+
+        in_temp.appendToAverage(temp);
+        in_hum.appendToAverage(hum);
+        co2_rate.appendToAverage(ppm);
+
+        if (curr_screen == MAIN) {
+            updateIndicator(temp, in_temp_ind, false);
+            updateIndicator(hum, in_hum_ind, false);
+            updateIndicator(ppm, co2_rate_ind, false);
+        }
     }
 
     if (curr_screen == MAIN && curr_time - prev_check >= CHECK_PER) {
         uint8_t minute = rtc.getMinutes();
         if (minute != curr_min) {
             curr_min = minute;
+            uint8_t month = rtc.getMonth(); uint8_t day = rtc.getDay();
+            uint8_t weekday = rtc.getWeekDay();
+            uint8_t hour = rtc.getHours();
+
+            adjustDaytime(&daytime, sunrise, sunset, hour, minute);
+            adjustDST(month, day, weekday, hour);
             updateTime(minute);
-            uint8_t weekday = rtc.getWeekDay() - 1;
+
             if (weekday != curr_weekday) {
                 curr_weekday = weekday;
+                adjustSolarEvents(&sunrise, &sunset, month, day, weekday);
                 updateDate();
-                updateIndicator(weekdays[weekday], weekday_ind, false);
+                updateIndicator(weekdays[weekday - 1], weekday_ind, false);
             }
         }
     }
