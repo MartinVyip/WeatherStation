@@ -76,7 +76,9 @@
 #define HUM_WEIGHT 0.3
 #define TEMP_WEIGHT 0.1
 
-#define CHECK_PER 250
+#define RECEIVE_THRES 1000
+#define PENDING_THRES 300000
+#define TIME_CHECK_PER 250
 #define ENC_FAST_TIME 150
 
 #define TFT_XMAX 320
@@ -94,19 +96,19 @@ const indicator_config out_temp_ind = {"right", 310, 40, 104, 4, 207, 37, 0xFE5C
                                        &CustomFont24pt, degree_celcius};
 const indicator_config out_hum_ind = {"right", 310, 77, 173, 47, 138, 31, 0x7BFF,
                                       &CustomFont18pt, " %"};
-const indicator_config out_press_ind = {"right", 310, 100, 178, 86, 133, 15, 0x2D6A,
+const indicator_config out_press_ind = {"right", 310, 100, 178, 86, 132, 15, 0x2D6A,
                                         &CustomFont10pt, " mmHg"};
-const indicator_config in_temp_ind = {"center", 252, 180, 199, 161, 107, 20, 0xFE5C,
+const indicator_config in_temp_ind = {"center", 250, 180, 197, 161, 107, 20, 0xFE5C,
                                       &CustomFont12pt, degree_celcius};
-const indicator_config in_hum_ind = {"center", 252, 205, 205, 185, 94, 21, 0x7BFF,
-                                    &CustomFont12pt, " %"};
-const indicator_config co2_rate_ind = {"center", 252, 230, 188, 216, 129, 15, 0x2D6A,
+const indicator_config in_hum_ind = {"center", 250, 206, 203, 186, 94, 22, 0x7BFF,
+                                     &CustomFont12pt, " %"};
+const indicator_config co2_rate_ind = {"center", 250, 230, 186, 216, 129, 15, 0x2D6A,
                                        &CustomFont10pt, " PPM"};
-const indicator_config time_ind = {"center", 90, 180, 5, 146, 171, 35, 0xFE5C,
+const indicator_config time_ind = {"center", 90, 178, 5, 144, 172, 35, 0xFE5C,
                                    &CustomFont24pt, ""};
-const indicator_config weekday_ind = {"center", 90, 210, 10, 194, 161, 17, 0xFE5C,
+const indicator_config weekday_ind = {"center", 90, 208, 10, 192, 161, 17, 0xFE5C,
                                       &CustomFont10pt, ""};
-const indicator_config date_ind = {"center", 90, 232, 36, 218, 109, 15, 0xFE5C,
+const indicator_config date_ind = {"center", 90, 230, 36, 216, 109, 15, 0xFE5C,
                                    &CustomFont10pt, ""};
 
 const uint16_t* const summer_graph_icons[] PROGMEM = {
@@ -122,23 +124,25 @@ const uint16_t* const winter_graph_icons[] PROGMEM = {
 };
 
 const icon_config tech_icon = {tal_tech, 10, 130, 50, 30};
-const icon_config indoor_icon = {indoor_ind, 192, 120, 120, 40};
+const icon_config indoor_icon = {indoor_ind, 190, 120, 120, 40};
+
+const icon_config link_icon = {nullptr, 10, 5, 40, 35};
 const icon_config graph_icon = {nullptr, 5, 5, 60, 60};
-const icon_config weather_icon = {nullptr, 28, 49, 115, 75};
+const icon_config weather_icon = {nullptr, 28, 51, 115, 75};
 
 const weathericon_config positive_weathers[] = {
-    {80, 100, {clear_day, 48, 49, 75, 75}, {clear_night, 56, 57, 60, 60}},
-    {60, 79, {sunny_day, 31, 49, 110, 75}, {starry_night, 31, 49, 110, 75}},
-    {40, 59, {good_day, 41, 49, 90, 75}, {good_night, 36, 49, 100, 75}},
-    {20, 39, {cloudy_day, 41, 49, 90, 75}, {cloudy_night, 41, 54, 90, 65}}
+    {80, 100, {clear_day, 48, 51, 75, 75}, {clear_night, 56, 60, 60, 60}},
+    {60, 79, {sunny_day, 31, 51, 110, 75}, {starry_night, 31, 51, 110, 75}},
+    {40, 59, {good_day, 41, 51, 90, 75}, {good_night, 36, 51, 100, 75}},
+    {20, 39, {cloudy_day, 41, 51, 90, 75}, {cloudy_night, 41, 56, 90, 65}}
 };
 
 const weathericon_config negative_weathers[] = {
-    {-36, -20, {moody_clouds, 40, 60, 92, 56}, {moody_clouds, 40, 60, 92, 56}},
-    {-53, -37, {sudden_rain, 38, 49, 95, 75}, {sudden_snow, 38, 52, 95, 70}},
-    {-69, -54, {decent_rain, 41, 49, 90, 75}, {decent_snow, 38, 52, 95, 70}},
-    {-85, -70, {shower, 41, 49, 90, 75}, {blizzard, 38, 52, 95, 70}},
-    {-100, -86, {thunderstorm, 41, 49, 90, 75}, {blizzard, 38, 52, 95, 70}}
+    {-36, -20, {moody_clouds, 40, 62, 92, 56}, {moody_clouds, 40, 62, 92, 56}},
+    {-53, -37, {sudden_rain, 38, 51, 95, 75}, {sudden_snow, 38, 54, 95, 70}},
+    {-69, -54, {decent_rain, 41, 51, 90, 75}, {decent_snow, 38, 54, 95, 70}},
+    {-85, -70, {shower, 41, 51, 90, 75}, {blizzard, 38, 54, 95, 70}},
+    {-100, -86, {thunderstorm, 41, 51, 90, 75}, {blizzard, 38, 54, 95, 70}}
 };
 
 const char weekdays[7][12] = {

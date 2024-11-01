@@ -1,5 +1,5 @@
-#ifndef SolarWeatherUtils_H
-#define SolarWeatherUtils_H
+#ifndef SolarWeatherUtils_h
+#define SolarWeatherUtils_h
 
 #include <Arduino.h>
 #include <rsc/Constants.h>

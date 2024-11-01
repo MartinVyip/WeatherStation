@@ -45,7 +45,7 @@ void adjustSolarEvents(uint16_t* sunrise, uint16_t* sunset,
 }
 
 void adjustSummertemp(bool* summertemp, float temp) {
-    *summertemp = (temp >= 0);
+    *summertemp = (temp >= -1);
 }
 
 void adjustDaytime(bool* daytime,

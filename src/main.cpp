@@ -155,6 +155,18 @@ void updateWeatherIcon(int8_t weather_rating, bool daytime, bool summertemp, boo
     }
 }
 
+void updateConnectionIcon(conn_statuses connection_status, bool initial) {
+    if (!initial) {
+        tft.fillRect(link_icon.x, link_icon.y,
+                     link_icon.width, link_icon.height, 0x0000);
+    }
+    const uint16_t* status_icon = (connection_status == RECEIVING) ? receiving
+                                : (connection_status == NO_CONN) ? no_connect
+                                : pending;
+    tft.drawRGBBitmap(link_icon.x, link_icon.y, status_icon,
+                      link_icon.width, link_icon.height);
+}
+
 void adjustDST(uint8_t month, uint8_t day, uint8_t weekday, uint8_t hour) {
     if (day >= 25 && weekday == 7) {
         if (month == 3 && hour == 3) {
@@ -165,10 +177,22 @@ void adjustDST(uint8_t month, uint8_t day, uint8_t weekday, uint8_t hour) {
     }
 }
 
-inline void buildMainScreen(bool daytime, bool summertemp) {
+void adjustRTC() {
+    uint8_t time_bytes[4];
+    uint32_t unix_time;
+    UART.readBytes(time_bytes, sizeof(time_bytes));
+    unix_time = (uint32_t)time_bytes[0] << 24 |
+                (uint32_t)time_bytes[1] << 16 |
+                (uint32_t)time_bytes[2] << 8 |
+                (uint32_t)time_bytes[3];
+    rtc.setEpoch(unix_time);
+}
+
+inline void buildMainScreen(bool daytime, bool summertemp, conn_statuses connection_status) {
     tft.drawRGBBitmap(indoor_icon.x, indoor_icon.y,
                       indoor_ind, indoor_icon.width, indoor_icon.height);
-    updateIndicator(out_temp.getLastValue(), out_temp_ind, true);
+    //updateIndicator(out_temp.getLastValue(), out_temp_ind, true);
+    updateIndicator(-27.7, out_temp_ind, true);
     updateIndicator(out_hum.getLastValue(), out_hum_ind, true);
     updateIndicator(out_press.getLastValue(), out_press_ind, true);
     updateIndicator(bme.readTemperature(), in_temp_ind, true);
@@ -180,6 +204,7 @@ inline void buildMainScreen(bool daytime, bool summertemp) {
                                     out_temp.findNormalizedTrendSlope(BACKSTEP_PER)
                                     );
     updateWeatherIcon(rate, daytime, summertemp, true);
+    updateConnectionIcon(connection_status, true);
     updateTime(rtc.getMinutes());
     updateDate();
 }
@@ -246,13 +271,16 @@ void setup() {
 void loop() {
     static modes curr_mode = SCROLLING;
     static screens curr_screen = MAIN;
+    static conn_statuses sens_status = NO_CONN;
     static bool daytime, summertemp, setup = true;
-    static uint32_t prev_upd_sens, prev_apd_sens, prev_check;
     static uint16_t sunset, sunrise;
-    static uint8_t curr_min, curr_weekday;
+    static uint8_t curr_mint, curr_weekday;
 
     enc.tick();
     uint32_t curr_time = millis();
+    static uint32_t prev_upd_sens = curr_time, prev_apd_sens = curr_time;
+    static uint32_t prev_check = curr_time - TIME_CHECK_PER;
+    static uint32_t prev_conn = curr_time - PENDING_THRES;
 
     if (curr_time - prev_apd_sens >= APD_PER) {
         prev_apd_sens = curr_time;
@@ -277,14 +305,7 @@ void loop() {
     }
 
     if (UART.available()) {
-        uint8_t time_bytes[4];
-        uint32_t unix_time;
-        UART.readBytes(time_bytes, sizeof(time_bytes));
-        unix_time = (uint32_t)time_bytes[0] << 24 |
-                    (uint32_t)time_bytes[1] << 16 |
-                    (uint32_t)time_bytes[2] << 8 |
-                    (uint32_t)time_bytes[3];
-        rtc.setEpoch(unix_time);
+        adjustRTC();
     }
 
     switch (curr_mode) {
@@ -305,7 +326,7 @@ void loop() {
                     plot->drawLogos(curr_screen, summertemp);
                     plot->annotate();
                 } else {
-                    buildMainScreen(daytime, summertemp);
+                    buildMainScreen(daytime, summertemp, sens_status);
                     prev_check = curr_time;
                 }
             }
@@ -384,6 +405,7 @@ void loop() {
         out_hum.appendToAverage(received_data[1]);
         out_press.appendToAverage(toMmHg(received_data[2]));
 
+        prev_conn = curr_time;
         adjustSummertemp(&summertemp, received_data[0]);
         if (curr_screen == MAIN) {
             updateIndicator(received_data[0], out_temp_ind, false);
@@ -409,10 +431,10 @@ void loop() {
         }
     }
 
-    if (curr_screen == MAIN && curr_time - prev_check >= CHECK_PER) {
+    if (curr_screen == MAIN && curr_time - prev_check >= TIME_CHECK_PER) {
         uint8_t minute = rtc.getMinutes();
-        if (minute != curr_min) {
-            curr_min = minute;
+        if (minute != curr_mint) {
+            curr_mint = minute;
             uint8_t month = rtc.getMonth(); uint8_t day = rtc.getDay();
             uint8_t weekday = rtc.getWeekDay();
             uint8_t hour = rtc.getHours();
@@ -426,6 +448,17 @@ void loop() {
                 adjustSolarEvents(&sunrise, &sunset, month, day, weekday);
                 updateDate();
                 updateIndicator(weekdays[weekday - 1], weekday_ind, false);
+            }
+        }
+
+        conn_statuses new_status = (curr_time - prev_conn < RECEIVE_THRES) ? RECEIVING
+                                 : (curr_time - prev_conn >= PENDING_THRES) ? NO_CONN
+                                 : PENDING;
+
+        if (new_status != sens_status) {
+            sens_status = new_status;
+            if (curr_screen == MAIN) {
+                updateConnectionIcon(sens_status, false);
             }
         }
     }

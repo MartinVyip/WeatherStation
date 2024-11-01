@@ -16,6 +16,12 @@ enum screens {
     CO2_RATE
 };
 
+enum conn_statuses {
+    RECEIVING,
+    PENDING,
+    NO_CONN
+};
+
 struct indicator_config {
     const char* alignment;
     const uint16_t aln_x, aln_y;
