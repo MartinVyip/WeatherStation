@@ -1,6 +1,6 @@
 template <typename input_type>
-Graph<input_type>::Graph(DataVault<input_type>& data_reference, Adafruit_ILI9341& tft_reference)
-    : _data(data_reference), _tft(tft_reference) {
+Graph<input_type>::Graph(DataVault<input_type>& data_ref, Adafruit_ILI9341& tft_ref)
+    : _data(data_ref), _tft(tft_ref) {
 }
 
 template <typename input_type>

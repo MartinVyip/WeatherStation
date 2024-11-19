@@ -9,15 +9,6 @@ uint16_t toMmHg(float pascals) {
     return round(pascals * 0.00750062);
 }
 
-uint16_t findDayOfYear(uint8_t month, uint8_t day) {
-    uint16_t months_sum = 0;
-    for (uint8_t i = 0; i < month - 1; i++) {
-        months_sum += days_in_month[i];
-    }
-
-    return months_sum + day;
-}
-
 bool checkDST(uint8_t month, uint8_t day, uint8_t weekday) {
     bool dst = (month > 3 && month < 10) ? true :
                (month < 3 || month > 10) ? false :

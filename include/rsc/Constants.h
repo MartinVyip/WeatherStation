@@ -10,7 +10,7 @@
 
 // ==================== SETTINGS ====================
 #define DATA_PNTS_AMT 1680
-#define UPD_PER 30000
+#define UPD_PER 60000
 #define APD_PER 360000
 #define PAN_SLOW 20
 #define PAN_FAST 50
@@ -63,12 +63,13 @@
 #define MH_RX PA15
 
 #define PIR PC1
+#define POW PC5
 
 #define ENC_KEY PA3
 #define ENC_S1 PA1
 #define ENC_S2 PA2
 
-// ===============DEVELOPMENT CONSTANTS =============
+// ============== DEVELOPMENT CONSTANTS =============
 #define RAW_SOLAR_NOON (60 * (GMT_OFFSET - LONGITUDE / 15))
 #define DAYCHANGE_AMP (60 * ((LONGEST_DAY - SHORTEST_DAY) >> 1))
 
@@ -78,8 +79,11 @@
 
 #define RECEIVE_THRES 1000
 #define PENDING_THRES 300000
+#define STORE_PER 3600000
 #define TIME_CHECK_PER 250
 #define ENC_FAST_TIME 150
+#define APD_PER_S (APD_PER / 60000)
+#define BYTES_PER_HOUR ((STORE_PER / APD_PER) << 1)
 
 #define TFT_XMAX 320
 #define TFT_YMAX 240
@@ -157,9 +161,20 @@ const char weekdays[7][12] = {
 
 const uint8_t days_in_month[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
+// ===================== MACROS =====================
+#define SAVE_BACKUP_STATE(ready) (eeprom.writeByte(0, (ready)))
+#define READ_BACKUP_STATE()      (eeprom.readByte(0))
+#define STORE_BYTES(array, index, bytes) \
+    (array)[(index) << 1] = (bytes)[0]; \
+    (array)[((index) << 1) + 1] = (bytes)[1];
+
 // =================== EXCEPTIONS ===================
 #if (TICK_PER < 4 || 24 % TICK_PER != 0)
 #error "Invalid ticking period"
+#endif
+
+#if (STORE_PER % APD_PER != 0)
+#error "Only whole number of appends should fit into storage period"
 #endif
 
 #endif

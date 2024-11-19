@@ -1,13 +1,14 @@
 #include <Arduino.h>
+#include <STM32FreeRTOS.h>
 #include <SPI.h>
 #include <Wire.h>
 #include <SoftwareSerial.h>
 
 #include <rsc/Constants.h>
-#include <GraphingBase.h>
 #include <GraphingEngine.h>
 #include <DataVault.h>
 #include <SolarWeatherUtils.h>
+#include <TimeUtils.h>
 
 #include <Adafruit_GFX.h>
 #include <Adafruit_ILI9341.h>
@@ -28,16 +29,28 @@ Adafruit_BME280 bme;
 EncButton enc(ENC_S1, ENC_S2, ENC_KEY);
 RF24 radio(RF_CE, RF_CSN);
 MHZ19 co2;
-I2C_eeprom eeprom(0x50, &I2C);
+I2C_eeprom eeprom(0x50, I2C_DEVICESIZE_24LC256, &I2C);
 STM32RTC& rtc = STM32RTC::getInstance();
 
-DataVault <float> out_temp(DATA_PNTS_AMT, TEMP_NORM_RANGE);
-DataVault <float> out_hum(DATA_PNTS_AMT, HUM_NORM_RANGE);
-DataVault <uint16_t> out_press(DATA_PNTS_AMT, PRESS_NORM_RANGE);
-DataVault <float> in_temp(DATA_PNTS_AMT);
-DataVault <float> in_hum(DATA_PNTS_AMT);
-DataVault <uint16_t> co2_rate(DATA_PNTS_AMT);
+DataVault <float> out_temp(DATA_PNTS_AMT, TEMP_NORM_RANGE, eeprom);
+DataVault <float> out_hum(DATA_PNTS_AMT, HUM_NORM_RANGE, eeprom);
+DataVault <uint16_t> out_press(DATA_PNTS_AMT, PRESS_NORM_RANGE, eeprom);
+DataVault <float> in_temp(DATA_PNTS_AMT, eeprom);
+DataVault <float> in_hum(DATA_PNTS_AMT, eeprom);
+DataVault <uint16_t> co2_rate(DATA_PNTS_AMT, eeprom);
+
 GraphBase* plot = nullptr;
+std::vector<VaultBase*> vaults = {
+    &out_temp, &out_hum, &out_press,
+    &in_temp, &in_hum,
+    &co2_rate
+};
+
+uint16_t last_backup_min;
+bool backup_ready = false;
+volatile uint16_t year_day = 0;
+volatile uint16_t day_min = 0;
+volatile bool backup_flag = false;
 
 inline void tftSetup() {
     pinMode(TFT_LED, OUTPUT);
@@ -63,10 +76,15 @@ inline void rtcSetup() {
     rtc.begin();
 }
 
+inline void eepromSetup() {
+    eeprom.begin();
+    eeprom.setPageSize(64);
+}
+
 inline void co2Setup() {
     MH_UART.begin(9600);
-    co2.begin(MH_UART);
-    co2.autoCalibration(false);
+    //co2.begin(MH_UART);
+    //co2.autoCalibration(false);
 }
 
 inline void hardwareSetup() {
@@ -78,10 +96,98 @@ inline void hardwareSetup() {
     radioSetup();
     rtcSetup();
     tftSetup();
-    eeprom.begin();
+    eepromSetup();
     bme.begin(0x76, &I2C);
 
     enc.setFastTimeout(ENC_FAST_TIME);
+    pinMode(LED, OUTPUT);
+    pinMode(POW, INPUT);
+}
+
+void saveInt(uint16_t value, uint16_t* addr) {
+    eeprom.writeByte((*addr)++, (value >> 8) & 0xFF);
+    eeprom.writeByte((*addr)++, value & 0xFF);
+}
+
+uint16_t readInt(uint16_t* addr) {
+    uint8_t high_byte = eeprom.readByte((*addr)++);
+    uint8_t low_byte = eeprom.readByte((*addr)++);
+    return (high_byte << 8) | low_byte;
+}
+
+void createRawBackup() {
+    uint16_t addr = 6;
+
+    SAVE_BACKUP_STATE(false);
+    saveInt(out_temp.getHeadCount(), &addr);
+    for (auto& vault : vaults) {
+        vault->savePeriodicData(&addr);
+    }
+    last_backup_min = findMinutesOfDay(rtc.getHours(), rtc.getMinutes());
+    backup_ready = true;
+}
+
+void finalizeBackup() {
+    uint8_t elapsed_time = findDayMinutesDifference(day_min, last_backup_min);
+    uint8_t emergency_data_count = backup_ready ? (elapsed_time / APD_PER_S) : 0;
+
+    uint16_t addr = 1;
+    saveInt(year_day, &addr);
+    saveInt(day_min, &addr);
+    eeprom.writeByte(addr++, emergency_data_count);
+    if (emergency_data_count) {
+        for (auto& vault : vaults) {
+            vault->saveEmergencyData(emergency_data_count);
+        }
+    } else if (!backup_ready) {
+        saveInt(out_temp.getHeadCount(), &addr);
+        for (auto& vault : vaults) {
+            vault->savePeriodicData(&addr);
+        }
+    }
+    SAVE_BACKUP_STATE(true);
+}
+
+void rawBackupTask(void*) {
+    createRawBackup();
+    vTaskDelete(NULL);
+}
+
+void finalizeBackupInterrupt() {
+    digitalWrite(TFT_LED, LOW);
+    year_day = findDayOfYear(rtc.getMonth(), rtc.getDay());
+    day_min = findMinutesOfDay(rtc.getHours(), rtc.getMinutes());
+    backup_flag = true;
+}
+
+void restoreAuxiliaryData(uint16_t &addr, uint32_t &elapsed_time, uint16_t &periodic_cnt,
+                          uint8_t &emergency_cnt, uint16_t &missing_cnt, uint16_t &start_index) {
+    uint16_t curr_year_day = findDayOfYear(rtc.getMonth(), rtc.getDay());
+    uint16_t curr_day_min = findMinutesOfDay(rtc.getHours(), rtc.getMinutes());
+    elapsed_time = findYearMinutesDifference(curr_year_day, curr_day_min,
+                                             readInt(&addr), readInt(&addr));
+    
+    emergency_cnt = eeprom.readByte(addr++);
+    periodic_cnt = readInt(&addr);
+    missing_cnt = elapsed_time / APD_PER_S;
+    uint16_t total_count = periodic_cnt + emergency_cnt + missing_cnt;
+    start_index = (total_count > DATA_PNTS_AMT) ? total_count - DATA_PNTS_AMT : 0;
+}
+
+void pullBackup() {
+    uint16_t addr = 1;
+    uint32_t elapsed_time;
+    uint16_t periodic_cnt, missing_cnt, start_idx;
+    uint8_t emergency_cnt;
+    uint8_t curr_wday = rtc.getWeekDay(), curr_hour = rtc.getHours(), curr_min = rtc.getMinutes();
+
+    restoreAuxiliaryData(addr, elapsed_time, periodic_cnt, emergency_cnt, missing_cnt, start_idx);
+    if (elapsed_time < DATA_PNTS_AMT * APD_PER_S) {
+        for (auto& vault : vaults) {
+            vault->restorePointsData(&addr, start_idx, periodic_cnt, emergency_cnt, missing_cnt);
+            vault->assignTimestamps(curr_wday, curr_hour, curr_min);
+        }
+    }
 }
 
 template <typename input_type>
@@ -140,7 +246,8 @@ void updateWeatherIcon(int8_t weather_rating, bool daytime, bool summertemp, boo
         for (const auto& config : positive_weathers) {
             if (weather_rating >= config.min_rating && weather_rating <= config.max_rating) {
                 const icon_config& optimal = daytime ? config.option1 : config.option2;
-                tft.drawRGBBitmap(optimal.x, optimal.y, optimal.bitmap, optimal.width, optimal.height);
+                tft.drawRGBBitmap(optimal.x, optimal.y, optimal.bitmap,
+                                  optimal.width, optimal.height);
                 break;
             }
         }
@@ -148,14 +255,15 @@ void updateWeatherIcon(int8_t weather_rating, bool daytime, bool summertemp, boo
         for (const auto& config : negative_weathers) {
             if (weather_rating >= config.min_rating && weather_rating <= config.max_rating) {
                 const icon_config& optimal = summertemp ? config.option1 : config.option2;
-                tft.drawRGBBitmap(optimal.x, optimal.y, optimal.bitmap, optimal.width, optimal.height);
+                tft.drawRGBBitmap(optimal.x, optimal.y, optimal.bitmap,
+                                  optimal.width, optimal.height);
                 break;
             }
         }
     }
 }
 
-void updateConnectionIcon(conn_statuses connection_status, bool initial) {
+void updateConnectionIcon(enum conn_statuses connection_status, bool initial) {
     if (!initial) {
         tft.fillRect(link_icon.x, link_icon.y,
                      link_icon.width, link_icon.height, 0x0000);
@@ -188,21 +296,21 @@ void adjustRTC() {
     rtc.setEpoch(unix_time);
 }
 
-inline void buildMainScreen(bool daytime, bool summertemp, conn_statuses connection_status) {
+inline void buildMainScreen(bool daytime, bool summertemp, enum conn_statuses connection_status) {
     tft.drawRGBBitmap(indoor_icon.x, indoor_icon.y,
                       indoor_ind, indoor_icon.width, indoor_icon.height);
-    //updateIndicator(out_temp.getLastValue(), out_temp_ind, true);
-    updateIndicator(-27.7, out_temp_ind, true);
+
+    updateIndicator(out_temp.getLastValue(), out_temp_ind, true);
     updateIndicator(out_hum.getLastValue(), out_hum_ind, true);
     updateIndicator(out_press.getLastValue(), out_press_ind, true);
     updateIndicator(bme.readTemperature(), in_temp_ind, true);
     updateIndicator(bme.readHumidity(), in_hum_ind, true);
-    updateIndicator(co2.getCO2(), co2_rate_ind, true);
+    //updateIndicator(co2.getCO2(), co2_rate_ind, true);
     updateIndicator(weekdays[rtc.getWeekDay() - 1], weekday_ind, true);
+
     int8_t rate = findWeatherRating(out_press.findNormalizedTrendSlope(BACKSTEP_PER),
                                     out_hum.findNormalizedTrendSlope(BACKSTEP_PER),
-                                    out_temp.findNormalizedTrendSlope(BACKSTEP_PER)
-                                    );
+                                    out_temp.findNormalizedTrendSlope(BACKSTEP_PER));
     updateWeatherIcon(rate, daytime, summertemp, true);
     updateConnectionIcon(connection_status, true);
     updateTime(rtc.getMinutes());
@@ -212,6 +320,12 @@ inline void buildMainScreen(bool daytime, bool summertemp, conn_statuses connect
 
 void setup() {
     hardwareSetup();
+
+    if (READ_BACKUP_STATE()) {
+        tft.fillScreen(0x0000);
+        pullBackup();
+    }
+    attachInterrupt(digitalPinToInterrupt(POW), finalizeBackupInterrupt, FALLING);
 
     const int numPoints = 1680;
     const float frequency = 10;
@@ -278,9 +392,15 @@ void loop() {
 
     enc.tick();
     uint32_t curr_time = millis();
-    static uint32_t prev_upd_sens = curr_time, prev_apd_sens = curr_time;
+    static uint32_t prev_upd_sens = curr_time, prev_apd_sens = curr_time, prev_backup = curr_time;
     static uint32_t prev_check = curr_time - TIME_CHECK_PER;
     static uint32_t prev_conn = curr_time - PENDING_THRES;
+
+    if (backup_flag) {
+        noInterrupts();
+        finalizeBackup();
+        backup_flag = false;
+    }
 
     if (curr_time - prev_apd_sens >= APD_PER) {
         prev_apd_sens = curr_time;
@@ -288,20 +408,19 @@ void loop() {
         uint8_t hour = rtc.getHours();
         uint8_t minute = rtc.getMinutes();
 
-        out_temp.appendToVault(weekday, hour, minute);
-        out_hum.appendToVault(weekday, hour, minute);
-        out_press.appendToVault(weekday, hour, minute);
-        in_temp.appendToVault(weekday, hour, minute);
-        in_hum.appendToVault(weekday, hour, minute);
-        co2_rate.appendToVault(weekday, hour, minute);
+        for (auto& vault : vaults) {
+            vault->appendToVault(weekday, hour, minute);
+        }
 
         if (curr_screen == MAIN) {
             int8_t rate = findWeatherRating(out_press.findNormalizedTrendSlope(BACKSTEP_PER),
                                             out_hum.findNormalizedTrendSlope(BACKSTEP_PER),
-                                            out_temp.findNormalizedTrendSlope(BACKSTEP_PER)
-                                            );
+                                            out_temp.findNormalizedTrendSlope(BACKSTEP_PER));
             updateWeatherIcon(rate, daytime, summertemp, false);
         }
+    } else if (curr_time - prev_backup >= STORE_PER) {
+        prev_backup = curr_time;
+        xTaskCreate(rawBackupTask, "periodic_backup", 1024, NULL, 2, NULL);
     }
 
     if (UART.available()) {
@@ -418,16 +537,16 @@ void loop() {
         prev_upd_sens = curr_time;
         float temp = bme.readTemperature();
         float hum = bme.readHumidity();
-        uint16_t ppm = co2.getCO2();
+        //uint16_t ppm = co2.getCO2();
 
         in_temp.appendToAverage(temp);
         in_hum.appendToAverage(hum);
-        co2_rate.appendToAverage(ppm);
+        //co2_rate.appendToAverage(ppm);
 
         if (curr_screen == MAIN) {
             updateIndicator(temp, in_temp_ind, false);
             updateIndicator(hum, in_hum_ind, false);
-            updateIndicator(ppm, co2_rate_ind, false);
+            //updateIndicator(ppm, co2_rate_ind, false);
         }
     }
 

@@ -2,6 +2,9 @@
 #define DataVault_h
 
 #include <Arduino.h>
+#include <I2C_eeprom.h>
+
+#include <TimeUtils.h>
 #include <rsc/Constants.h>
 
 template <typename input_type>
@@ -12,18 +15,36 @@ struct DataPoint {
     uint8_t minute;
 };
 
-template <typename input_type>
-class DataVault {
+class VaultBase {
 public:
-    DataVault(uint16_t data_size);
-    DataVault(uint16_t data_size, float slope_normalization);
+    virtual void appendToVault(uint8_t wday, uint8_t hour, uint8_t min) = 0;
+    virtual void savePeriodicData(uint16_t* curr_addr) = 0;
+    virtual void saveEmergencyData(uint8_t emergency_data_count) = 0;
+    virtual void restorePointsData(uint16_t* curr_addr, uint16_t st_index,
+                                   uint16_t per_count, uint8_t em_count, uint16_t miss_count) = 0;
+    virtual void assignTimestamps(uint8_t curr_wday, uint8_t curr_hour, uint8_t curr_min) = 0;
+
+    virtual ~VaultBase() {}
+};
+
+template <typename input_type>
+class DataVault : public VaultBase {
+public:
+    DataVault(uint16_t data_size, I2C_eeprom& eeprom_ref);
+    DataVault(uint16_t data_size, float slope_norm, I2C_eeprom& eeprom_ref);
     ~DataVault();
 
-    void appendToVault(uint8_t wday, uint8_t hour, uint8_t min);
+    void appendToVault(uint8_t wday, uint8_t hour, uint8_t min) override;
     void appendToAverage(input_type value);
     input_type findSampleMax(uint16_t startpoint, uint16_t endpoint) const;
     input_type findSampleMin(uint16_t startpoint, uint16_t endpoint) const;
     int8_t findNormalizedTrendSlope(uint8_t period) const;
+
+    void savePeriodicData(uint16_t* curr_addr) override;
+    void saveEmergencyData(uint8_t new_data_points) override;
+    void restorePointsData(uint16_t* curr_addr, uint16_t st_index,
+                           uint16_t per_count, uint8_t em_count, uint16_t miss_count) override;
+    void assignTimestamps(uint8_t curr_wday, uint8_t curr_hour, uint8_t curr_min) override;
 
     const DataPoint<input_type>* getData() const;
     input_type getLastValue() const;
@@ -33,13 +54,15 @@ public:
 
 private:
     DataPoint<input_type>* _data;
+    I2C_eeprom& _eeprom;
 
-    uint16_t _buffer_size, _head_count;
+    uint16_t _buffer_size, _head_count, _emergency_addr;
     input_type _average_sum;
     uint8_t _average_counter;
     float _norm_coef = 0;
 
-    uint16_t convertToMinutes(uint8_t wday, uint8_t hour, uint8_t min) const;
+    void getBytesFromValue(input_type value, uint8_t* bytes) const;
+    input_type getValueFromBytes(uint8_t* bytes) const;
     uint16_t findStartIndex(uint8_t backstep_time_period) const;
     int8_t normalizeSlope(float slope) const;
 };

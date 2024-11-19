@@ -6,12 +6,24 @@
 
 #include <rsc/Constants.h>
 #include <DataVault.h>
-#include <GraphingBase.h>
+
+class GraphBase {
+public:
+    virtual void drawLocal(bool local_sizing = true) = 0;
+    virtual void drawFresh(bool local_sizing = true) = 0;
+    virtual void drawCursor(bool initial = false) = 0;
+    virtual void dynamicPan(int8_t step) = 0;
+    virtual void dynamicCursor(int8_t step) = 0;
+    virtual void annotate(bool dayscale = true) = 0;
+    virtual void drawLogos(enum screens screen, bool high) = 0;
+
+    virtual ~GraphBase() {}
+};
 
 template <typename input_type>
 class Graph : public GraphBase {
 public:
-    Graph(DataVault<input_type>& data_reference, Adafruit_ILI9341& tft_reference);
+    Graph(DataVault<input_type>& data_ref, Adafruit_ILI9341& tft_ref);
     ~Graph() override = default;
 
     void drawLocal(bool local_sizing = true) override;
