@@ -4,11 +4,11 @@
 #include <Wire.h>
 #include <SoftwareSerial.h>
 
-#include <rsc/Constants.h>
-#include <GraphingEngine.h>
-#include <DataVault.h>
-#include <SolarWeatherUtils.h>
-#include <TimeUtils.h>
+#include <config/Constants.h>
+#include <classes/GraphingEngine.h>
+#include <classes/DataVault.h>
+#include <utils/SolarWeatherUtils.h>
+#include <utils/TimeUtils.h>
 
 #include <Adafruit_GFX.h>
 #include <Adafruit_ILI9341.h>
@@ -46,7 +46,7 @@ std::vector<VaultBase*> vaults = {
     &co2_rate
 };
 
-uint16_t last_backup_min;
+uint16_t last_day_min;
 bool backup_ready = false;
 volatile uint16_t year_day = 0;
 volatile uint16_t day_min = 0;
@@ -62,8 +62,6 @@ inline void tftSetup() {
 
 inline void radioSetup() {
     radio.begin();
-    radio.setAutoAck(true);
-    radio.setRetries(0, 5);
     radio.setPALevel(RF24_PA_MAX);
     radio.setDataRate(RF24_250KBPS);
     radio.setChannel(0x60);
@@ -89,19 +87,11 @@ inline void co2Setup() {
 
 inline void hardwareSetup() {
     delay(500);
-    UART.begin(115200);
-    I2C.begin();
-
-    co2Setup();
-    radioSetup();
-    rtcSetup();
-    tftSetup();
-    eepromSetup();
+    UART.begin(115200); I2C.begin();
+    co2Setup(); radioSetup(); rtcSetup(); tftSetup(); eepromSetup();
     bme.begin(0x76, &I2C);
-
     enc.setFastTimeout(ENC_FAST_TIME);
-    pinMode(LED, OUTPUT);
-    pinMode(POW, INPUT);
+    pinMode(LED, OUTPUT); pinMode(POW, INPUT); pinMode(PIR, INPUT);
 }
 
 void saveInt(uint16_t value, uint16_t* addr) {
@@ -123,12 +113,12 @@ void createRawBackup() {
     for (auto& vault : vaults) {
         vault->savePeriodicData(&addr);
     }
-    last_backup_min = findMinutesOfDay(rtc.getHours(), rtc.getMinutes());
+    last_day_min = findMinutesOfDay(rtc.getHours(), rtc.getMinutes());
     backup_ready = true;
 }
 
 void finalizeBackup() {
-    uint8_t elapsed_time = findDayMinutesDifference(day_min, last_backup_min);
+    uint8_t elapsed_time = findDayMinutesDifference(day_min, last_day_min);
     uint8_t emergency_data_count = backup_ready ? (elapsed_time / APD_PER_S) : 0;
 
     uint16_t addr = 1;
@@ -166,7 +156,7 @@ void restoreAuxiliaryData(uint16_t &addr, uint32_t &elapsed_time, uint16_t &peri
     uint16_t curr_day_min = findMinutesOfDay(rtc.getHours(), rtc.getMinutes());
     elapsed_time = findYearMinutesDifference(curr_year_day, curr_day_min,
                                              readInt(&addr), readInt(&addr));
-    
+
     emergency_cnt = eeprom.readByte(addr++);
     periodic_cnt = readInt(&addr);
     missing_cnt = elapsed_time / APD_PER_S;
@@ -188,6 +178,14 @@ void pullBackup() {
             vault->assignTimestamps(curr_wday, curr_hour, curr_min);
         }
     }
+}
+
+void clearRectangle(const icon_config& icon) {
+    tft.fillRect(icon.x, icon.y, icon.width, icon.height, 0x0000);
+}
+
+void drawIcon(const icon_config& icon) {
+    tft.drawRGBBitmap(icon.x, icon.y, icon.bitmap, icon.width, icon.height);
 }
 
 template <typename input_type>
@@ -219,7 +217,6 @@ void updateIndicator(input_type value, const indicator_config& settings, bool in
         tft.fillRect(settings.bound_x, settings.bound_y,
                      settings.bound_width, settings.bound_height, 0x0000);
     }
-
     tft.write(output);
 }
 
@@ -236,27 +233,29 @@ void updateDate() {
 }
 
 void updateWeatherIcon(int8_t weather_rating, bool daytime, bool summertemp, bool initial) {
+    static const icon_config* optimal = nullptr;
+
     if (!initial && (weather_rating >= positive_weathers[3].min_rating ||
         weather_rating <= negative_weathers[0].max_rating)) {
-        tft.fillRect(weather_icon.x, weather_icon.y,
-                     weather_icon.width, weather_icon.height, 0x0000);
+        clearRectangle(weather_icon);
+    } else if (initial && (weather_rating < positive_weathers[3].min_rating ||
+               weather_rating > negative_weathers[0].max_rating) && optimal != nullptr) {
+        drawIcon(*optimal);
     }
 
     if (weather_rating >= 0) {
         for (const auto& config : positive_weathers) {
             if (weather_rating >= config.min_rating && weather_rating <= config.max_rating) {
-                const icon_config& optimal = daytime ? config.option1 : config.option2;
-                tft.drawRGBBitmap(optimal.x, optimal.y, optimal.bitmap,
-                                  optimal.width, optimal.height);
+                optimal = daytime ? &config.option1 : &config.option2;
+                drawIcon(*optimal);
                 break;
             }
         }
     } else {
         for (const auto& config : negative_weathers) {
             if (weather_rating >= config.min_rating && weather_rating <= config.max_rating) {
-                const icon_config& optimal = summertemp ? config.option1 : config.option2;
-                tft.drawRGBBitmap(optimal.x, optimal.y, optimal.bitmap,
-                                  optimal.width, optimal.height);
+                optimal = summertemp ? &config.option1 : &config.option2;
+                drawIcon(*optimal);
                 break;
             }
         }
@@ -264,15 +263,13 @@ void updateWeatherIcon(int8_t weather_rating, bool daytime, bool summertemp, boo
 }
 
 void updateConnectionIcon(enum conn_statuses connection_status, bool initial) {
-    if (!initial) {
-        tft.fillRect(link_icon.x, link_icon.y,
-                     link_icon.width, link_icon.height, 0x0000);
-    }
-    const uint16_t* status_icon = (connection_status == RECEIVING) ? receiving
-                                : (connection_status == NO_CONN) ? no_connect
-                                : pending;
-    tft.drawRGBBitmap(link_icon.x, link_icon.y, status_icon,
-                      link_icon.width, link_icon.height);
+    if (!initial) clearRectangle(link_icon);
+    const uint16_t* status_bitmap = (connection_status == RECEIVING) ? receiving
+                                  : (connection_status == NO_CONN) ? no_connect
+                                  : pending;
+    icon_config status_icon = {status_bitmap, link_icon.x, link_icon.y,
+                               link_icon.width, link_icon.height};
+    drawIcon(status_icon);
 }
 
 void adjustDST(uint8_t month, uint8_t day, uint8_t weekday, uint8_t hour) {
@@ -297,9 +294,7 @@ void adjustRTC() {
 }
 
 inline void buildMainScreen(bool daytime, bool summertemp, enum conn_statuses connection_status) {
-    tft.drawRGBBitmap(indoor_icon.x, indoor_icon.y,
-                      indoor_ind, indoor_icon.width, indoor_icon.height);
-
+    drawIcon(indoor_icon);
     updateIndicator(out_temp.getLastValue(), out_temp_ind, true);
     updateIndicator(out_hum.getLastValue(), out_hum_ind, true);
     updateIndicator(out_press.getLastValue(), out_press_ind, true);
@@ -320,64 +315,11 @@ inline void buildMainScreen(bool daytime, bool summertemp, enum conn_statuses co
 
 void setup() {
     hardwareSetup();
+    attachInterrupt(digitalPinToInterrupt(POW), finalizeBackupInterrupt, FALLING);
 
     if (READ_BACKUP_STATE()) {
         tft.fillScreen(0x0000);
         pullBackup();
-    }
-    attachInterrupt(digitalPinToInterrupt(POW), finalizeBackupInterrupt, FALLING);
-
-    const int numPoints = 1680;
-    const float frequency = 10;
-
-    int day = 0;
-    int hour = 0;
-    int minute = 0;
-
-    for (int i = 0; i < numPoints; i++) {
-        float angle = i * (2 * PI / numPoints);
-
-        // Create unique value for out_temp using a mix of sine wave and sawtooth wave
-        float value1 = sin(angle * frequency) * (numPoints - i) / 25 + (fmod(i, 100) / 5.0) - 10;
-        out_temp.appendToAverage(value1);
-        out_temp.appendToVault(day, hour, minute);
-
-        // out_hum with triangle wave
-        value1 = abs(fmod(i * 2, 200) - 100) / 10.0 - 40 + cos(angle * frequency) * 5;
-        out_hum.appendToAverage(value1);
-        out_hum.appendToVault(day, hour, minute);
-
-        // in_temp with sine + square wave combination
-        value1 = (sin(angle * frequency * 2) > 0 ? 1 : -1) * (numPoints - i) / 15 + sin(angle * frequency * 3) * 5 + 85;
-        in_temp.appendToAverage(value1);
-        in_temp.appendToVault(day, hour, minute);
-
-        // in_hum with a combination of triangle and sine wave
-        value1 = (abs(fmod(i * 3, 300) - 150) / 15.0) + sin(angle * frequency / 4) * 5;
-        in_hum.appendToAverage(value1);
-        in_hum.appendToVault(day, hour, minute);
-
-        // out_press with sawtooth wave + sine wave
-        uint16_t value2 = sin(angle * frequency * 3) * 15 + 760;
-        out_press.appendToAverage(value2);
-        out_press.appendToVault(day, hour, minute);
-
-        // co2_rate with cosine + step function
-        value2 = ((i % 200 > 100) ? 100 : 0) + cos(angle * frequency) * (numPoints - i) + 1950 + i % 50;
-        co2_rate.appendToAverage(value2);
-        co2_rate.appendToVault(day, hour, minute);
-        minute += 6;
-        if (minute >= 60) {
-            minute = 0;
-            hour++;
-            if (hour >= 24) {
-                hour = 0;
-                day++;
-                if (day > 7) {
-                    day = 0;
-                }
-            }
-        }
     }
 }
 
@@ -392,7 +334,8 @@ void loop() {
 
     enc.tick();
     uint32_t curr_time = millis();
-    static uint32_t prev_upd_sens = curr_time, prev_apd_sens = curr_time, prev_backup = curr_time;
+    static uint32_t prev_upd_sens = curr_time, prev_apd_sens = curr_time;
+    static uint32_t prev_backup = curr_time, prev_pir_signal = curr_time;
     static uint32_t prev_check = curr_time - TIME_CHECK_PER;
     static uint32_t prev_conn = curr_time - PENDING_THRES;
 
@@ -424,6 +367,7 @@ void loop() {
     }
 
     if (UART.available()) {
+        prev_check -= TIME_CHECK_PER;
         adjustRTC();
     }
 
@@ -450,7 +394,7 @@ void loop() {
                 }
             }
 
-            if (enc.turn()) {
+            if (enc.turn() && out_temp.getHeadCount()) {
                 if (enc.left()) {
                     curr_screen = (curr_screen > MAIN) ? (screens)(curr_screen - 1) : CO2_RATE;
                 } else if (enc.right()) {
@@ -461,8 +405,11 @@ void loop() {
                 prev_check = curr_time;
                 setup = true;
             } else if (enc.click()) {
-                if (curr_screen != MAIN) {
+                if (curr_screen != MAIN && out_temp.getHeadCount() > TFT_XMAX - L_EDGE) {
                     curr_mode = PANNING;
+                    setup = true;
+                } else if (curr_screen != MAIN && out_temp.getHeadCount() > CRECT_SIDE) {
+                    curr_mode = CURSOR;
                     setup = true;
                 }
             }
@@ -503,10 +450,10 @@ void loop() {
             if (enc.turn()) {
                 int8_t step = ((enc.fast()) ? CRSR_FAST : CRSR_SLOW) * enc.dir();
                 plot->dynamicCursor(step);
-            } else if (enc.click()) {
+            } else if (enc.click() && out_temp.getHeadCount() > TFT_XMAX - L_EDGE) {
                 curr_mode = PANNING;
                 setup = true;
-            } else if (enc.hold()) {
+            } else if (enc.hold() || enc.click()) {
                 while(enc.holding());
                 curr_mode = SCROLLING;
                 plot->drawLocal();
@@ -580,5 +527,17 @@ void loop() {
                 updateConnectionIcon(sens_status, false);
             }
         }
+    }
+
+    if (digitalRead(TFT_LED) && curr_time - prev_pir_signal > AWAKE_PER) {
+        digitalWrite(TFT_LED, LOW);
+        if (curr_screen != MAIN) {
+            curr_screen = MAIN;
+            curr_mode = SCROLLING;
+            setup = true;
+        }
+    } else if (digitalRead(PIR)) {
+        digitalWrite(TFT_LED, HIGH);
+        prev_pir_signal = curr_time;
     }
 }
