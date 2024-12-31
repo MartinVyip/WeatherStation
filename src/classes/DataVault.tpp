@@ -1,19 +1,10 @@
 template <typename input_type>
-DataVault<input_type>::DataVault(uint16_t data_size, I2C_eeprom& eeprom_ref) 
-    : _buffer_size(data_size), _eeprom(eeprom_ref) {
-    _data = new DataPoint<input_type>[data_size];
-}
+DataVault<input_type>::DataVault(I2C_eeprom& eeprom_ref) 
+    : _eeprom(eeprom_ref) {}
 
 template <typename input_type>
-DataVault<input_type>::DataVault(uint16_t data_size, float slope_norm, I2C_eeprom& eeprom_ref) 
-    : _buffer_size(data_size), _norm_coef(slope_norm), _eeprom(eeprom_ref) {
-    _data = new DataPoint<input_type>[data_size];
-}
-
-template <typename input_type>
-DataVault<input_type>::~DataVault() {
-    delete[] _data;
-}
+DataVault<input_type>::DataVault(float slope_norm, I2C_eeprom& eeprom_ref) 
+    : _norm_coef(slope_norm), _eeprom(eeprom_ref) {}
 
 template <typename input_type>
 void DataVault<input_type>::appendToVault(uint8_t wday, uint8_t hour, uint8_t min) {
@@ -26,14 +17,14 @@ void DataVault<input_type>::appendToVault(uint8_t wday, uint8_t hour, uint8_t mi
     _average_sum = value;
     _average_counter = 1;
 
-    if (_head_count < _buffer_size) {
+    if (_head_count < DATA_PNTS_AMT) {
         _data[_head_count] = {value, wday, hour, min};
         _head_count++;
     } else {
-        for (uint16_t i = 1; i < _buffer_size; i++) {
+        for (uint16_t i = 1; i < DATA_PNTS_AMT; i++) {
             _data[i - 1] = _data[i];
         }
-        _data[_buffer_size - 1] = {value, wday, hour, min};
+        _data[DATA_PNTS_AMT - 1] = {value, wday, hour, min};
     }
 }
 
@@ -145,7 +136,7 @@ void DataVault<input_type>::restorePointsData(uint16_t* curr_addr,
 
     if (miss_count && _head_count) {
         input_type last_point = _data[_head_count - 1].value;
-        for (uint16_t i = 0; i < miss_count && _head_count < _buffer_size; i++) {
+        for (uint16_t i = 0; i < miss_count && _head_count < DATA_PNTS_AMT; i++) {
             _data[_head_count++].value = last_point;
         }
     }
@@ -181,6 +172,7 @@ const DataPoint<input_type>* DataVault<input_type>::getData() const {
 
 template <typename input_type>
 input_type DataVault<input_type>::getLastValue() const {
+    if (_head_count == 0) return 0;
     return _data[_head_count - 1].value;
 }
 

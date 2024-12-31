@@ -1,25 +1,21 @@
-#ifndef enums_h
-#define enums_h
+#ifndef Structs_h
+#define Structs_h
 
 #include <Adafruit_GFX.h>
+#include <config/Enums.h>
 
-enum modes {
-    SCROLLING,
-    PANNING,
-    CURSOR
-};
-
-enum screens {
-    MAIN,
-    OUT_TEMP, OUT_HUM, OUT_PRESS,
-    IN_TEMP, IN_HUM,
-    CO2_RATE
-};
-
-enum conn_statuses {
-    RECEIVING,
-    PENDING,
-    NO_CONN
+struct state_config {
+    modes curr_mode = SCROLLING;
+    screens curr_screen = MAIN;
+    conn_statuses radio_status = NO_CONN;
+    bool daytime = false;
+    bool summertemp = false;
+    bool setup = true;
+    uint16_t sunset = 0;
+    uint16_t sunrise = 0;
+    uint8_t curr_mint = 0;
+    uint8_t curr_weekday = 0;
+    uint32_t prev_conn = 0;
 };
 
 struct indicator_config {

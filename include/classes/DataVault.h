@@ -30,9 +30,8 @@ public:
 template <typename input_type>
 class DataVault : public VaultBase {
 public:
-    DataVault(uint16_t data_size, I2C_eeprom& eeprom_ref);
-    DataVault(uint16_t data_size, float slope_norm, I2C_eeprom& eeprom_ref);
-    ~DataVault();
+    DataVault(I2C_eeprom& _eeprom_ptr);
+    DataVault(float slope_norm, I2C_eeprom& eeprom_ptr);
 
     void appendToVault(uint8_t wday, uint8_t hour, uint8_t min) override;
     void appendToAverage(input_type value);
@@ -53,10 +52,10 @@ public:
     static void getCharValue(input_type value, char* buffer);
 
 private:
-    DataPoint<input_type>* _data;
+    DataPoint<input_type> _data[DATA_PNTS_AMT];
     I2C_eeprom& _eeprom;
 
-    uint16_t _buffer_size, _head_count, _emergency_addr;
+    uint16_t _head_count, _emergency_addr;
     input_type _average_sum;
     uint8_t _average_counter;
     float _norm_coef = 0;

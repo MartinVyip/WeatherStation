@@ -6,12 +6,16 @@
 #include <rsc/fonts/CustomFont18pt.h>
 #include <rsc/fonts/CustomFont24pt.h>
 #include <rsc/Bitmaps.h>
-#include <config/Enums&Structs.h>
+#include <config/Enums.h>
+#include <config/Structs.h>
+
 
 // ==================== SETTINGS ====================
+
 #define DATA_PNTS_AMT 1680  // amount of stored data points
 #define UPD_PER 60000  // indoor sensors polling period [ms]
 #define APD_PER 360000  // period of appending new values to vault [ms]
+#define BLK_PER 20  // builtin led blinking period during emergency backup [ms]
 #define AWAKE_PER 60000  // display backlight timeout [ms]
 #define PAN_SLOW 20  // panning speed slow [data points/turn]
 #define PAN_FAST 50  // panning speed fast [data points/turn]
@@ -29,7 +33,9 @@
 #define SHORTEST_DAY 6  // day lenght during winter solstice [hours]
 #define GMT_OFFSET 2  // GMT offset, without Daylight Saving Time (DST) [hours]
 
+
 // ===================== COLORS =====================
+
 #define TEXT_CLR1 0xFE5C  // graph tick data
 #define TEXT_CLR2 0xFE5C  // graph weekday
 #define TEXT_CLR3 0xFE5C  // cursor data
@@ -41,7 +47,9 @@
 #define PLOT_CLR 0xC618  // curve
 #define CRSR_CLR 0xF800  // cursor
 
+
 // ===================== IO PINS ====================
+
 #define LED PC6
 #define TX PA9
 #define RX PA10
@@ -60,8 +68,8 @@
 #define RF_CE PC4
 #define RF_CSN PA4
 
-#define MH_TX PA14
-#define MH_RX PA15
+#define MH_HD PA14
+#define MH_PWM PA15
 
 #define PIR PC1
 #define POW PC5
@@ -70,7 +78,9 @@
 #define ENC_S1 PA1
 #define ENC_S2 PA2
 
+
 // ============== DEVELOPMENT CONSTANTS =============
+
 #define RAW_SOLAR_NOON (60 * (GMT_OFFSET - LONGITUDE / 15))
 #define DAYCHANGE_AMP (60 * ((LONGEST_DAY - SHORTEST_DAY) >> 1))
 
@@ -80,8 +90,15 @@
 
 #define RECEIVE_THRES 1000
 #define PENDING_THRES 300000
+
 #define STORE_PER 3600000
-#define TIME_CHECK_PER 250
+#define POLL_POW_PER 10
+#define POLL_ENC_PER 5
+#define POLL_BUFS_PER 50
+#define POLL_PIR_PER 500
+#define POLL_RTC_PER 250
+#define SCREEN_UPD_PER 50
+
 #define ENC_FAST_TIME 150
 #define APD_PER_S (APD_PER / 60000)
 #define BYTES_PER_HOUR ((STORE_PER / APD_PER) << 1)
@@ -162,20 +179,28 @@ const char weekdays[7][12] = {
 
 const uint8_t days_in_month[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 
+
 // ===================== MACROS =====================
+
 #define SAVE_BACKUP_STATE(ready) (eeprom.writeByte(0, (ready)))
 #define READ_BACKUP_STATE()      (eeprom.readByte(0))
 #define STORE_BYTES(array, index, bytes) \
     (array)[(index) << 1] = (bytes)[0]; \
     (array)[((index) << 1) + 1] = (bytes)[1];
 
+
 // =================== EXCEPTIONS ===================
+
 #if (TICK_PER < 4 || 24 % TICK_PER != 0)
 #error "Invalid ticking period"
 #endif
 
 #if (STORE_PER % APD_PER != 0)
 #error "Only whole number of appends should fit into storage period"
+#endif
+
+#if (DATA_PNTS_AMT > 1680)
+#error "Stack overflow risk due to statically filled RAM"
 #endif
 
 #endif

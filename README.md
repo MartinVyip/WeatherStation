@@ -26,11 +26,21 @@ include/
 │   └── GraphingEngine.h             # Graphical representation of data
 ├── config/
 │   ├── Constants.h                  # IO pins, macros, settings etc.
-│   └── Enums&Structs.h              # Data structure definitions
+│   ├── Enums.h                      # Enumeration definitions
+│   ├── Globals.h                    # Extern global variables
+│   └── Structs.h                    # Data structure definitions
+├── core/
+│   ├── Backup.h                     # Backup-related key functions
+│   ├── Display.h                    # Display-related key functions
+│   ├── Peripherals.h                # Hardware initializations
+│   ├── Tasks.h                      # FreeRTOS tasks
+│   └── Time.h                       # Time and RTC-related key functions
 ├── rsc/
 │   ├── Bitmaps.h                    # Bitmap graphics
 │   └── fonts/                       # Custom fonts
 └── utils/
+    ├── BME280.h                     # Custom BME280 sensor library
+    ├── MHZ19B.h                     # Custom MHZ19B sensor library
     ├── SolarWeatherUtils.h          # Solar events and weather estimation
     └── TimeUtils.h                  # Time-related utilities
 logos/
@@ -42,6 +52,7 @@ logos/
 src/
 ├── main.cpp                         # Main station program
 ├── classes/                         # Class implementations
+├── core/                            # Core functions implementation
 ├── helpers/
 │   └── UNIXSender.py                # Script for setting time 
 └── utils/                           # Utility implementations
@@ -78,7 +89,7 @@ Weather prediction is performed based on [least squares interpolation](https://e
 2. **Correction Using the Equation of Time**:  
    The solar noon estimate is refined with the [equation of time](https://en.wikipedia.org/wiki/Equation_of_time), which accounts for the irregularities caused by the Earth's orbital eccentricity and axial tilt.
 
-Using the corrected solar noon as a reference, the station calculates sunrise and sunset times by incorporating the device’s latitude, [GMT offset](https://en.wikipedia.org/wiki/Greenwich_Mean_Time), and the declination of the Sun. This method achieves a precision of a few minutes.
+Using the corrected solar noon as a reference, the station calculates sunrise and sunset times by incorporating the device’s longitude, [GMT offset](https://en.wikipedia.org/wiki/Greenwich_Mean_Time), and the declination of the Sun. This method achieves a precision of a few minutes.
 
 ### **Custom Graphics** 
 A custom font, designed with the [Adafruit GFX Font Customiser](https://tchapi.github.io/Adafruit-GFX-Font-Customiser/), ensures clarity. All icons were converted to bitmaps using the [Bitmaper application](https://alexgyver.github.io/Bitmaper/).
@@ -96,7 +107,7 @@ A PIR sensor detects user presence, automatically turning off the display backli
 The base station stores a week of weather data, allowing users to study metrics graphically. Graphs display daily spans, automatically scaled with maximum and minimum indicators. A rotary encoder enables scrolling through week-long data, switching between day-based and week-based views, and zooming in with a cursor to inspect specific data points. All graph dynamics are rendered with real-time internal graphics calculations, leveraging the STM32F4's [floating-point unit](https://en.wikipedia.org/wiki/Floating-point_unit) for glitch-free performance.
 
 ### **Power Loss Recovery**
-In case of a power loss, a 0.1F supercapacitor allows data to be backed up to 32kB EEPROM. The station performs periodic raw data backups every hour, saving only a portion of data directly during power loss. Upon restoration, the device fills gaps using the last available value and recalculates time offsets. A hard reset button clears all stored data, while an RTC powered by a 25F supercapacitor ensures accurate timekeeping.
+In case of a power loss, a 0.22F supercapacitor allows data to be backed up to 32kB EEPROM. The station performs periodic raw data backups every hour, saving only a portion of data directly during power loss. Upon restoration, the device fills gaps using the last available value and recalculates time offsets. A hard reset button clears all stored data, while an RTC powered by a 25F supercapacitor ensures accurate timekeeping.
 
 
 ## SensModule
@@ -108,7 +119,7 @@ The remote sensor module collects outdoor environmental data and transmits it to
 The module is powered by a combination of a solar panel with a 25F supercapacitor and a 3V lithium battery. The solar panel serves as the primary power source, with the lithium battery as a backup for extreme conditions, such as prolonged snow coverage.
 
 ### **Delivering Power**
-A single-chip boost converter has been added to step up the voltage from the power sources to a stable 3.5V. This ensures reliable operation even with low input voltage (as low as 400mV) from the solar panel. [Power supply redundancy schematic](https://elentec.narod.ru/Documents/part10/Index0.htm) prioritizes the higher voltage source, allowing the module to operate seamlessly under varying conditions.
+A single-chip boost converter has been added to step up the voltage from the power sources to a stable 3.6V. This ensures reliable operation even with low input voltage (as low as 400mV) from the solar panel. [Power supply redundancy schematic](https://elentec.narod.ru/Documents/part10/Index0.htm) prioritizes the higher voltage source, allowing the module to operate seamlessly under varying conditions.
 
 ### **Low Power Consumption**
 The module is exceptionally efficient, consuming just 5.8µA in idle mode (99.5% of the time). This allows the lithium battery to power the module for over four years without solar input.
