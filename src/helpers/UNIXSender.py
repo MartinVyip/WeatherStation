@@ -4,7 +4,7 @@ import time
 from threading import Thread
 
 GMT_OFFSET = +2
-COM_PORT = 'COM10'
+COM_PORT = 'COM16'
 BAUD_RATE = 115200
 
 trig = False

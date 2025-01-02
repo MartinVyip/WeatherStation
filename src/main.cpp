@@ -37,16 +37,17 @@ bool backup_ready = false;
 state_config state;
 SemaphoreHandle_t power_loss, enc_event, enc_release;
 SemaphoreHandle_t state_lock, vault_lock;
-TaskHandle_t task_handles[12];
-TaskHandle_t blink_task = NULL;
+TaskHandle_t tasks[12];
 
 
 void setup() {
     hardwareSetup();
 
     if (READ_BACKUP_STATE()) {
+        digitalWrite(LED, HIGH);
         tft.fillScreen(0x0000);
         pullBackup();
+        digitalWrite(LED, LOW);
     }
 
     power_loss = xSemaphoreCreateBinary();
@@ -56,18 +57,18 @@ void setup() {
     state_lock = xSemaphoreCreateMutex();
     vault_lock = xSemaphoreCreateMutex();
 
-    xTaskCreate(pollPower, "PowerPinPolling", 128, NULL, 4, &task_handles[POWER_TASK]);
-    xTaskCreate(pollEncoder, "EncoderPolling", 128, NULL, 4, &task_handles[ENC_TASK]);
-    xTaskCreate(pollRTCEvents, "RTCEvents", 256, NULL, 3, &task_handles[RTC_TASK]);
-    xTaskCreate(pollPIREvents, "PIRPolling", 128, NULL, 1, &task_handles[PIR_TASK]);
-    xTaskCreate(pollInputBuffers, "BuffersPolling", 128, NULL, 2, &task_handles[BUFFERS_TASK]);
+    xTaskCreate(pollPower, "PowerPinPolling", 128, NULL, 4, &tasks[POWER_TASK]);
+    xTaskCreate(pollEncoder, "EncoderPolling", 128, NULL, 4, &tasks[ENC_TASK]);
+    xTaskCreate(pollRTCEvents, "RTCEvents", 256, NULL, 3, &tasks[RTC_TASK]);
+    xTaskCreate(pollPIREvents, "PIRPolling", 128, NULL, 1, &tasks[PIR_TASK]);
+    xTaskCreate(pollInputBuffers, "BuffersPolling", 128, NULL, 2, &tasks[BUFFERS_TASK]);
 
-    xTaskCreate(emergencyBackup, "EmergencyBackup", 256, NULL, 4, NULL);
-    xTaskCreate(periodicBackup, "PeriodicBackup", 256, NULL, 2, &task_handles[PERIODIC_BACKUP_TASK]);
+    xTaskCreate(periodicBackup, "PeriodicBackup", 1024, NULL, 2, &tasks[PERIODIC_BACKUP_TASK]);
+    xTaskCreate(emergencyBackup, "EmergencyBackup", 1024, NULL, 4, NULL);
 
-    xTaskCreate(dataAppend, "DataAppend", 256, NULL, 3, &task_handles[APPEND_TASK]);
-    xTaskCreate(dataUpdate, "DataUpdate", 256, NULL, 2, &task_handles[UPDATE_TASK]);
-    xTaskCreate(plotUpdate, "PlotUpdate", 512, NULL, 4, &task_handles[PLOT_TASK]);
+    xTaskCreate(dataAppend, "DataAppend", 256, NULL, 3, &tasks[APPEND_TASK]);
+    xTaskCreate(dataUpdate, "DataUpdate", 256, NULL, 2, &tasks[UPDATE_TASK]);
+    xTaskCreate(plotUpdate, "PlotUpdate", 512, NULL, 4, &tasks[PLOT_TASK]);
 
     vTaskStartScheduler();
 }

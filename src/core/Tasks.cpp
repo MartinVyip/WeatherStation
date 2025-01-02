@@ -4,24 +4,19 @@
 #include <core/Display.h>
 #include <core/Time.h>
 
-void blink(void*) {
-    TickType_t last_wakeup = xTaskGetTickCount();
-    for(;;) {
-        digitalWrite(LED, !digitalRead(LED));
-        vTaskDelayUntil(&last_wakeup, pdMS_TO_TICKS(BLK_PER));
-    }
-}
-
 void pollPower(void*) {
     for (;;) {
         if (!digitalRead(POW)) {
-            xSemaphoreGive(power_loss);
+            digitalWrite(TFT_LED, LOW);
             for (int8_t i = 0; i < NUM_TASKS; i++) {
-                if (task_handles[i] != NULL) {
-                    vTaskSuspend(task_handles[i]);
+                if (tasks[i] != NULL && i != POWER_TASK) {
+                    vTaskSuspend(tasks[i]);
                 }
             }
-            while(!digitalRead(POW));
+            xSemaphoreGive(power_loss);
+            xSemaphoreGive(vault_lock);
+            while(!digitalRead(POW)) vTaskDelay(pdMS_TO_TICKS(POLL_POW_PER));
+            xTaskCreate(emergencyBackup, "EmergencyBackup", 1024, NULL, 4, NULL);
         }
         vTaskDelay(pdMS_TO_TICKS(POLL_POW_PER));
     }
@@ -83,6 +78,7 @@ void pollInputBuffers(void*) {
     for (;;) {
         if (UART.available()) adjustRTC();
         if (radio.available()) {
+            digitalWrite(LED, HIGH);
             float received_data[3];
             radio.read(&received_data, sizeof(received_data));
             if (xSemaphoreTake(vault_lock, portMAX_DELAY)) {
@@ -102,6 +98,7 @@ void pollInputBuffers(void*) {
                 }
                 xSemaphoreGive(state_lock);
             }
+            digitalWrite(LED, LOW);
         }
         vTaskDelay(pdMS_TO_TICKS(POLL_BUFS_PER));
     }
@@ -109,21 +106,17 @@ void pollInputBuffers(void*) {
 
 void emergencyBackup(void*) {
     if (xSemaphoreTake(power_loss, portMAX_DELAY)) {
-        digitalWrite(TFT_LED, LOW);
-        xTaskCreate(blink, "emergency_backup", 64, NULL, 1, &blink_task);
-
+        digitalWrite(LED, HIGH);
         if (xSemaphoreTake(vault_lock, portMAX_DELAY)) {
             finalizeBackup();
             xSemaphoreGive(vault_lock);
         }
-
-        vTaskDelete(blink_task);
-        digitalWrite(LED, HIGH);
         for (int8_t i = 0; i < NUM_TASKS; i++) {
-            if (task_handles[i] != NULL) {
-                vTaskResume(task_handles[i]);
+            if (tasks[i] != NULL && i != POWER_TASK) {
+                vTaskResume(tasks[i]);
             }
         }
+        digitalWrite(LED, LOW);
     }
 }
 
@@ -189,7 +182,9 @@ void dataUpdate(void*) {
             }
             xSemaphoreGive(state_lock);
         }
+        digitalWrite(LED, LOW);
         vTaskDelayUntil(&last_wakeup, pdMS_TO_TICKS(UPD_PER));
+        digitalWrite(LED, HIGH);
     }
 }
 
@@ -226,6 +221,7 @@ void plotUpdate(void*) {
                             }
                         } else {
                             buildMainScreen(state);
+                            state.curr_mint = rtc.getMinutes();
                         }
                     }
 

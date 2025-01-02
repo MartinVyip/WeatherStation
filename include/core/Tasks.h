@@ -1,8 +1,6 @@
 #ifndef Tasks_h
 #define Tasks_h
 
-void blink(void*);
-
 void pollPower(void*);
 void pollEncoder(void*);
 void pollRTCEvents(void*);

@@ -104,7 +104,7 @@ The connection icon provides real-time feedback:
 A PIR sensor detects user presence, automatically turning off the display backlight after a minute of inactivity.
 
 ### **Graphical Data Analysis** 
-The base station stores a week of weather data, allowing users to study metrics graphically. Graphs display daily spans, automatically scaled with maximum and minimum indicators. A rotary encoder enables scrolling through week-long data, switching between day-based and week-based views, and zooming in with a cursor to inspect specific data points. All graph dynamics are rendered with real-time internal graphics calculations, leveraging the STM32F4's [floating-point unit](https://en.wikipedia.org/wiki/Floating-point_unit) for glitch-free performance.
+The base station stores 5 days of weather data, allowing users to study metrics graphically. Graphs display daily spans, automatically scaled with maximum and minimum indicators. A rotary encoder enables scrolling through week-long data, switching between day-based and week-based views, and zooming in with a cursor to inspect specific data points. All graph dynamics are rendered with real-time internal graphics calculations, leveraging the STM32F4's [floating-point unit](https://en.wikipedia.org/wiki/Floating-point_unit) for glitch-free performance.
 
 ### **Power Loss Recovery**
 In case of a power loss, a 0.22F supercapacitor allows data to be backed up to 32kB EEPROM. The station performs periodic raw data backups every hour, saving only a portion of data directly during power loss. Upon restoration, the device fills gaps using the last available value and recalculates time offsets. A hard reset button clears all stored data, while an RTC powered by a 25F supercapacitor ensures accurate timekeeping.

@@ -12,10 +12,9 @@
 
 // ==================== SETTINGS ====================
 
-#define DATA_PNTS_AMT 1680  // amount of stored data points
+#define DATA_PNTS_AMT 1200  // amount of stored data points
 #define UPD_PER 60000  // indoor sensors polling period [ms]
 #define APD_PER 360000  // period of appending new values to vault [ms]
-#define BLK_PER 20  // builtin led blinking period during emergency backup [ms]
 #define AWAKE_PER 60000  // display backlight timeout [ms]
 #define PAN_SLOW 20  // panning speed slow [data points/turn]
 #define PAN_FAST 50  // panning speed fast [data points/turn]
@@ -68,8 +67,8 @@
 #define RF_CE PC4
 #define RF_CSN PA4
 
-#define MH_HD PA14
-#define MH_PWM PA15
+#define MH_PWM PA14
+#define MH_HD PA15
 
 #define PIR PC1
 #define POW PC5
@@ -199,8 +198,8 @@ const uint8_t days_in_month[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
 #error "Only whole number of appends should fit into storage period"
 #endif
 
-#if (DATA_PNTS_AMT > 1680)
-#error "Stack overflow risk due to statically filled RAM"
+#if (DATA_PNTS_AMT > 1200)
+#warning "Stack overflow risk due to statically filled RAM"
 #endif
 
 #endif

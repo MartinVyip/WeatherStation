@@ -24,7 +24,8 @@ void updateDate() {
 void updateWeatherIcon(int8_t weather_rating, state_config& state, bool initial) {
     static const icon_config* optimal = nullptr;
 
-    if (initial && optimal != nullptr) {
+    if (initial && weather_rating < positive_weathers[3].min_rating &&
+        weather_rating > negative_weathers[0].max_rating && optimal != nullptr) {
         drawIcon(*optimal);
     }
 
