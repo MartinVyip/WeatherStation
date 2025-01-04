@@ -8,7 +8,7 @@ MHZ19B::MHZ19B(const uint8_t pwm_pin, const uint8_t hd_pin)
 }
 
 uint16_t MHZ19B::readCO2(bool update) {
-    if (_pulse_width == 0 || update) measure();
+    if (_pulse_width == 2 || update) measure();
     return ((_pulse_width - 2) << 2);
 }
 

@@ -13,7 +13,7 @@ public:
 private:
     void measure();
 
-    uint16_t _pulse_width = 0;
+    uint16_t _pulse_width = 2;
     uint8_t _pwm_pin;
     uint8_t _hd_pin;
 };

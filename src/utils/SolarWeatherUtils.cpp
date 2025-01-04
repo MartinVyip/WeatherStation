@@ -6,7 +6,7 @@ int8_t findWeatherRating(int8_t press_rate, int8_t hum_rate, int8_t temp_rate) {
 }
 
 float toMmHg(float pascals) {
-    return pascals * 0.00750062 + 15;
+    return pascals * 0.00750062;
 }
 
 bool checkDST(uint8_t month, uint8_t day, uint8_t weekday) {
