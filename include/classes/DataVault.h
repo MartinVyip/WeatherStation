@@ -49,7 +49,7 @@ public:
     input_type getLastValue() const;
     uint16_t getHeadCount() const;
     void getCharTime(uint16_t index, char* buffer) const;
-    static void getCharValue(input_type value, char* buffer);
+    static void getCharValue(input_type value, char* buffer, bool forced_round = false);
 
 private:
     DataPoint<input_type> _data[DATA_PNTS_AMT];

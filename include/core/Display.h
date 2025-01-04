@@ -11,7 +11,7 @@ void updateIndicator(input_type value, const indicator_config& settings, bool in
     char output[15];
 
     if constexpr (std::is_arithmetic<input_type>::value) {
-        DataVault<input_type>::getCharValue(value, output);
+        DataVault<input_type>::getCharValue(value, output, settings.forced_round);
         strcat(output, settings.unit);
     } else {
         strcpy(output, static_cast<const char*>(value));

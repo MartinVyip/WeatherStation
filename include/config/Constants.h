@@ -23,9 +23,9 @@
 #define TICK_PER 6  // graph ticks period [hours]
 
 #define BACKSTEP_PER 90  // time period used for weather prediction [min]
-#define PRESS_NORM_RANGE 0.2  // highest pressure change [mmHg/min]
-#define HUM_NORM_RANGE 0.3  // highest humidity change [%/min]
-#define TEMP_NORM_RANGE 0.1  // highest temperature change [°C/min]
+#define PRESS_NORM_RANGE 0.01  // highest pressure change [mmHg/min]
+#define HUM_NORM_RANGE 0.5  // highest humidity change [%/min]
+#define TEMP_NORM_RANGE 0.15  // highest temperature change [°C/min]
 
 #define LONGITUDE 24.75  // station location longitude [degrees]
 #define LONGEST_DAY 18  // day length during summer solstice [hours]
@@ -114,23 +114,23 @@
 
 const char degree_celcius[] = {0x7F, 'C', '\0'};
 const indicator_config out_temp_ind = {"right", 310, 40, 104, 4, 207, 37, 0xFE5C,
-                                       &CustomFont24pt, degree_celcius};
+                                       &CustomFont24pt, degree_celcius, false};
 const indicator_config out_hum_ind = {"right", 310, 77, 169, 47, 142, 31, 0x7BFF,
-                                      &CustomFont18pt, " %"};
+                                      &CustomFont18pt, " %", false};
 const indicator_config out_press_ind = {"right", 310, 100, 178, 86, 132, 15, 0x2D6A,
-                                        &CustomFont10pt, " mmHg"};
-const indicator_config in_temp_ind = {"center", 250, 180, 197, 161, 107, 20, 0xFE5C,
-                                      &CustomFont12pt, degree_celcius};
+                                        &CustomFont10pt, " mmHg", true};
+const indicator_config in_temp_ind = {"center", 250, 180, 192, 161, 116, 20, 0xFE5C,
+                                      &CustomFont12pt, degree_celcius, false};
 const indicator_config in_hum_ind = {"center", 250, 206, 203, 186, 95, 22, 0x7BFF,
-                                     &CustomFont12pt, " %"};
+                                     &CustomFont12pt, " %", false};
 const indicator_config co2_rate_ind = {"center", 250, 230, 186, 216, 129, 15, 0x2D6A,
-                                       &CustomFont10pt, " PPM"};
+                                       &CustomFont10pt, " PPM", false};
 const indicator_config time_ind = {"center", 90, 178, 5, 144, 172, 35, 0xFE5C,
-                                   &CustomFont24pt, ""};
+                                   &CustomFont24pt, "", false};
 const indicator_config weekday_ind = {"center", 90, 208, 10, 192, 161, 17, 0xFE5C,
-                                      &CustomFont10pt, ""};
+                                      &CustomFont10pt, "", false};
 const indicator_config date_ind = {"center", 90, 230, 36, 216, 109, 15, 0xFE5C,
-                                   &CustomFont10pt, ""};
+                                   &CustomFont10pt, "", false};
 
 const uint16_t* const summer_graph_icons[] PROGMEM = {
     nullptr,

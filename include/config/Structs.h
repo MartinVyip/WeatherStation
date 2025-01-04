@@ -26,6 +26,7 @@ struct indicator_config {
     const uint16_t color;
     const GFXfont* font;
     const char* unit;
+    const bool forced_round;
 };
 
 struct icon_config {

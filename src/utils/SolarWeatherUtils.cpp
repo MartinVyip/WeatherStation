@@ -5,8 +5,8 @@ int8_t findWeatherRating(int8_t press_rate, int8_t hum_rate, int8_t temp_rate) {
     return constrain(rating, -100, 100);
 }
 
-uint16_t toMmHg(float pascals) {
-    return round(pascals * 0.00750062);
+float toMmHg(float pascals) {
+    return pascals * 0.00750062 + 15;
 }
 
 bool checkDST(uint8_t month, uint8_t day, uint8_t weekday) {

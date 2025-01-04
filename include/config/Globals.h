@@ -35,7 +35,7 @@ extern STM32RTC& rtc;
 
 extern DataVault <float> out_temp;
 extern DataVault <float> out_hum;
-extern DataVault <uint16_t> out_press;
+extern DataVault <float> out_press;
 extern DataVault <float> in_temp;
 extern DataVault <float> in_hum;
 extern DataVault <uint16_t> co2_rate;

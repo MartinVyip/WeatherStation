@@ -187,8 +187,11 @@ void DataVault<input_type>::getCharTime(uint16_t index, char* buffer) const {
 }
 
 template <typename input_type>
-void DataVault<input_type>::getCharValue(input_type value, char* buffer) {
-    if constexpr (std::is_floating_point<input_type>::value) {
+void DataVault<input_type>::getCharValue(input_type value, char* buffer, bool forced_round) {
+    if (forced_round) {
+        int16_t rounded_value = static_cast<int>(round(value));
+        sprintf(buffer, "%d", rounded_value);
+    } else if constexpr (std::is_floating_point<input_type>::value) {
         int16_t int_part = static_cast<int>(value);
         float frac_part = value - int_part;
         int16_t round_frac = static_cast<int>(round(frac_part * 10));

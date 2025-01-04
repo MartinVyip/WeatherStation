@@ -19,7 +19,7 @@ STM32RTC& rtc = STM32RTC::getInstance();
 
 DataVault <float> out_temp(TEMP_NORM_RANGE, eeprom);
 DataVault <float> out_hum(HUM_NORM_RANGE, eeprom);
-DataVault <uint16_t> out_press(PRESS_NORM_RANGE, eeprom);
+DataVault <float> out_press(PRESS_NORM_RANGE, eeprom);
 DataVault <float> in_temp(eeprom);
 DataVault <float> in_hum(eeprom);
 DataVault <uint16_t> co2_rate(eeprom);
@@ -68,7 +68,7 @@ void setup() {
 
     xTaskCreate(dataAppend, "DataAppend", 256, NULL, 3, &tasks[APPEND_TASK]);
     xTaskCreate(dataUpdate, "DataUpdate", 256, NULL, 2, &tasks[UPDATE_TASK]);
-    xTaskCreate(plotUpdate, "PlotUpdate", 512, NULL, 4, &tasks[PLOT_TASK]);
+    xTaskCreate(plotUpdate, "PlotUpdate", 1024, NULL, 4, &tasks[PLOT_TASK]);
 
     vTaskStartScheduler();
 }

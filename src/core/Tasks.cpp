@@ -152,6 +152,7 @@ void dataAppend(void*) {
                     xSemaphoreGive(vault_lock);
                     updateWeatherIcon(rate, state, false);
                 }
+                xSemaphoreGive(vault_lock);
                 xSemaphoreGive(state_lock);
             }
         }
@@ -209,7 +210,7 @@ void plotUpdate(void*) {
                                 switch (state.curr_screen) {
                                     case OUT_TEMP: plot = new Graph<float>(out_temp, tft); break;
                                     case OUT_HUM: plot = new Graph<float>(out_hum, tft); break;
-                                    case OUT_PRESS: plot = new Graph<uint16_t>(out_press, tft); break;
+                                    case OUT_PRESS: plot = new Graph<float>(out_press, tft); break;
                                     case IN_TEMP: plot = new Graph<float>(in_temp, tft); break;
                                     case IN_HUM: plot = new Graph<float>(in_hum, tft); break;
                                     case CO2_RATE: plot = new Graph<uint16_t>(co2_rate, tft); break;
