@@ -9,14 +9,16 @@ void pollPower(void*) {
         if (!digitalRead(POW)) {
             digitalWrite(TFT_LED, LOW);
             for (int8_t i = 0; i < NUM_TASKS; i++) {
-                if (tasks[i] != NULL && i != POWER_TASK) {
+                if (i != POWER_TASK && i != EMERGENCY_BACKUP_TASK
+                    && eTaskGetState(tasks[i]) != eSuspended) {
                     vTaskSuspend(tasks[i]);
                 }
             }
-            xSemaphoreGive(power_loss);
+            xTaskNotifyGive(tasks[EMERGENCY_BACKUP_TASK]);
             xSemaphoreGive(vault_lock);
             while(!digitalRead(POW)) vTaskDelay(pdMS_TO_TICKS(POLL_POW_PER));
-            xTaskCreate(emergencyBackup, "EmergencyBackup", 1024, NULL, 4, NULL);
+            xTaskCreate(emergencyBackup, "EmergencyBackup", 1024, NULL, 4,
+                        &tasks[EMERGENCY_BACKUP_TASK]);
         }
         vTaskDelay(pdMS_TO_TICKS(POLL_POW_PER));
     }
@@ -31,23 +33,6 @@ void pollEncoder(void*) {
         } else {
             vTaskDelay(pdMS_TO_TICKS(POLL_ENC_PER));
         }
-    }
-}
-
-void pollRTCEvents(void*) {
-    for (;;) {
-        if (xSemaphoreTake(state_lock, portMAX_DELAY)) {
-            if (state.curr_screen == MAIN) {
-                uint8_t minute = rtc.getMinutes();
-                if (minute != state.curr_mint) {
-                    state.curr_mint = minute;
-                    updateRTCEvents(state, minute);
-                }
-                updateConnectionStatus(state);
-            }
-            xSemaphoreGive(state_lock);
-        }
-        vTaskDelay(pdMS_TO_TICKS(POLL_RTC_PER));
     }
 }
 
@@ -104,20 +89,38 @@ void pollInputBuffers(void*) {
     }
 }
 
-void emergencyBackup(void*) {
-    if (xSemaphoreTake(power_loss, portMAX_DELAY)) {
-        digitalWrite(LED, HIGH);
-        if (xSemaphoreTake(vault_lock, portMAX_DELAY)) {
-            finalizeBackup();
-            xSemaphoreGive(vault_lock);
-        }
-        for (int8_t i = 0; i < NUM_TASKS; i++) {
-            if (tasks[i] != NULL && i != POWER_TASK) {
-                vTaskResume(tasks[i]);
+void pollRTCEvents(void*) {
+    for (;;) {
+        if (xSemaphoreTake(state_lock, portMAX_DELAY)) {
+            if (state.curr_screen == MAIN) {
+                uint8_t minute = rtc.getMinutes();
+                if (minute != state.curr_mint) {
+                    state.curr_mint = minute;
+                    updateRTCEvents(state, minute);
+                }
+                updateConnectionStatus(state);
             }
+            xSemaphoreGive(state_lock);
         }
-        digitalWrite(LED, LOW);
+        vTaskDelay(pdMS_TO_TICKS(POLL_RTC_PER));
     }
+}
+
+void emergencyBackup(void*) {
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+    digitalWrite(LED, HIGH);
+    if (xSemaphoreTake(vault_lock, portMAX_DELAY)) {
+        finalizeBackup();
+        xSemaphoreGive(vault_lock);
+    }
+    for (int8_t i = 0; i < NUM_TASKS; i++) {
+        if (i != POWER_TASK && i != EMERGENCY_BACKUP_TASK
+            && eTaskGetState(tasks[i]) == eSuspended) {
+            vTaskResume(tasks[i]);
+        }
+    }
+    digitalWrite(LED, LOW);
+    vTaskDelete(NULL);
 }
 
 void periodicBackup(void*) {
@@ -152,9 +155,9 @@ void dataAppend(void*) {
                     xSemaphoreGive(vault_lock);
                     updateWeatherIcon(rate, state, false);
                 }
-                xSemaphoreGive(vault_lock);
                 xSemaphoreGive(state_lock);
             }
+            xSemaphoreGive(vault_lock);
         }
         vTaskDelayUntil(&last_wakeup, pdMS_TO_TICKS(APD_PER));
     }
@@ -205,8 +208,8 @@ void plotUpdate(void*) {
                     if (state.setup) {
                         state.setup = false;
                         tft.fillScreen(0x0000);
-                        if (state.curr_screen != MAIN) {
-                            if (xSemaphoreTake(vault_lock, portMAX_DELAY)) {
+                        if (xSemaphoreTake(vault_lock, portMAX_DELAY)) {
+                            if (state.curr_screen != MAIN) {
                                 switch (state.curr_screen) {
                                     case OUT_TEMP: plot = new Graph<float>(out_temp, tft); break;
                                     case OUT_HUM: plot = new Graph<float>(out_hum, tft); break;
@@ -218,11 +221,11 @@ void plotUpdate(void*) {
                                 plot->drawFresh();
                                 plot->drawLogos(state.curr_screen, state.curr_mint);
                                 plot->annotate();
-                                xSemaphoreGive(vault_lock);
+                            } else {
+                                buildMainScreen(state);
+                                state.curr_mint = rtc.getMinutes();
                             }
-                        } else {
-                            buildMainScreen(state);
-                            state.curr_mint = rtc.getMinutes();
+                            xSemaphoreGive(vault_lock);
                         }
                     }
 

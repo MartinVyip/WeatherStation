@@ -56,8 +56,8 @@ private:
     I2C_eeprom& _eeprom;
 
     uint16_t _head_count, _emergency_addr;
-    input_type _average_sum;
-    uint8_t _average_counter;
+    input_type _average_sum = 0;
+    uint8_t _average_counter = 0;
     float _norm_coef = 0;
 
     void getBytesFromValue(input_type value, uint8_t* bytes) const;

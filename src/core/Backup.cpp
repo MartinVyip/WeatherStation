@@ -24,6 +24,7 @@ void createRawBackup() {
 }
 
 void finalizeBackup() {
+    if (READ_BACKUP_STATE()) return;
     uint16_t year_day = findDayOfYear(rtc.getMonth(), rtc.getDay());
     uint16_t day_min = findMinutesOfDay(rtc.getHours(), rtc.getMinutes());
     uint8_t elapsed_time = findDayMinutesDifference(day_min, last_day_min);

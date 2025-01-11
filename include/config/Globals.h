@@ -47,8 +47,8 @@ extern uint16_t last_day_min;
 extern bool backup_ready;
 
 extern state_config state;
-extern SemaphoreHandle_t power_loss, enc_event, enc_release;
+extern SemaphoreHandle_t enc_event, enc_release;
 extern SemaphoreHandle_t state_lock, vault_lock;
-extern TaskHandle_t tasks[12];
+extern TaskHandle_t tasks[NUM_TASKS];
 
 #endif

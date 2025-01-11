@@ -25,10 +25,11 @@ enum conn_statuses {
 enum periodics {
     POWER_TASK,
     ENC_TASK,
-    RTC_TASK,
     PIR_TASK,
     BUFFERS_TASK,
+    RTC_TASK,
     PERIODIC_BACKUP_TASK,
+    EMERGENCY_BACKUP_TASK,
     APPEND_TASK,
     UPDATE_TASK,
     PLOT_TASK,

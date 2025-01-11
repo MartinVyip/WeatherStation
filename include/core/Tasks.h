@@ -3,9 +3,9 @@
 
 void pollPower(void*);
 void pollEncoder(void*);
-void pollRTCEvents(void*);
 void pollPIREvents(void*);
 void pollInputBuffers(void*);
+void pollRTCEvents(void*);
 
 void emergencyBackup(void*);
 void periodicBackup(void*);

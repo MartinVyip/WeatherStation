@@ -35,9 +35,9 @@ uint16_t last_day_min;
 bool backup_ready = false;
 
 state_config state;
-SemaphoreHandle_t power_loss, enc_event, enc_release;
+SemaphoreHandle_t enc_event, enc_release;
 SemaphoreHandle_t state_lock, vault_lock;
-TaskHandle_t tasks[12];
+TaskHandle_t tasks[NUM_TASKS] = {NULL};
 
 
 void setup() {
@@ -50,7 +50,6 @@ void setup() {
         digitalWrite(LED, LOW);
     }
 
-    power_loss = xSemaphoreCreateBinary();
     enc_event = xSemaphoreCreateBinary();
     enc_release = xSemaphoreCreateBinary();
 
@@ -59,15 +58,15 @@ void setup() {
 
     xTaskCreate(pollPower, "PowerPinPolling", 128, NULL, 4, &tasks[POWER_TASK]);
     xTaskCreate(pollEncoder, "EncoderPolling", 128, NULL, 4, &tasks[ENC_TASK]);
-    xTaskCreate(pollRTCEvents, "RTCEvents", 256, NULL, 3, &tasks[RTC_TASK]);
     xTaskCreate(pollPIREvents, "PIRPolling", 128, NULL, 1, &tasks[PIR_TASK]);
-    xTaskCreate(pollInputBuffers, "BuffersPolling", 128, NULL, 2, &tasks[BUFFERS_TASK]);
+    xTaskCreate(pollInputBuffers, "BuffersPolling", 256, NULL, 2, &tasks[BUFFERS_TASK]);
+    xTaskCreate(pollRTCEvents, "RTCEvents", 256, NULL, 3, &tasks[RTC_TASK]);
 
     xTaskCreate(periodicBackup, "PeriodicBackup", 1024, NULL, 2, &tasks[PERIODIC_BACKUP_TASK]);
-    xTaskCreate(emergencyBackup, "EmergencyBackup", 1024, NULL, 4, NULL);
+    xTaskCreate(emergencyBackup, "EmergencyBackup", 1024, NULL, 4, &tasks[EMERGENCY_BACKUP_TASK]);
 
-    xTaskCreate(dataAppend, "DataAppend", 256, NULL, 3, &tasks[APPEND_TASK]);
-    xTaskCreate(dataUpdate, "DataUpdate", 256, NULL, 2, &tasks[UPDATE_TASK]);
+    xTaskCreate(dataAppend, "DataAppend", 512, NULL, 3, &tasks[APPEND_TASK]);
+    xTaskCreate(dataUpdate, "DataUpdate", 512, NULL, 2, &tasks[UPDATE_TASK]);
     xTaskCreate(plotUpdate, "PlotUpdate", 1024, NULL, 4, &tasks[PLOT_TASK]);
 
     vTaskStartScheduler();
