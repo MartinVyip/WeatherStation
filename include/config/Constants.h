@@ -22,7 +22,7 @@
 #define CRSR_FAST 10  // cursor speed fast [data points/turn]
 #define TICK_PER 6  // graph ticks period [hours]
 
-#define BACKSTEP_PER 90  // time period used for weather prediction [min]
+#define BACKSTEP_PER 75  // time period used for weather prediction [min]
 #define PRESS_NORM_RANGE 0.01  // highest pressure change [mmHg/min]
 #define HUM_NORM_RANGE 0.5  // highest humidity change [%/min]
 #define TEMP_NORM_RANGE 0.15  // highest temperature change [°C/min]

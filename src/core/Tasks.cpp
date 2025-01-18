@@ -94,7 +94,7 @@ void pollRTCEvents(void*) {
         if (xSemaphoreTake(state_lock, portMAX_DELAY)) {
             if (state.curr_screen == MAIN) {
                 uint8_t minute = rtc.getMinutes();
-                if (minute != state.curr_mint) {
+                if (minute != state.curr_mint && !state.setup) {
                     state.curr_mint = minute;
                     updateRTCEvents(state, minute);
                 }
