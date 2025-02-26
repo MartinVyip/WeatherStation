@@ -110,9 +110,9 @@ The base station stores 5 days of weather data, allowing users to study metrics 
 In case of a power loss, a 0.22F supercapacitor allows data to be backed up to 32kB EEPROM. The station performs periodic raw data backups every hour, saving only a portion of data directly during power loss. Upon restoration, the device fills gaps using the last available value and recalculates time offsets. A hard reset button clears all stored data, while an RTC powered by a 25F supercapacitor ensures accurate timekeeping.
 
 
-## SensModule
+## Sensing Module
 
-### **Basic Fucntion**
+### **Basic Function**
 The remote sensor module collects outdoor environmental data and transmits it to the base station via a radio connection. The module uses a PCB antenna, while the station features a 3dBi antenna with an SMA connector for enhanced signal strength.
 
 ### **Power Sources** 

@@ -14,7 +14,6 @@
 #include <utils/SolarWeatherUtils.h>
 #include <utils/TimeUtils.h>
 
-#include <Adafruit_GFX.h>
 #include <Adafruit_ILI9341.h>
 #include <RF24.h>
 #include <STM32RTC.h>

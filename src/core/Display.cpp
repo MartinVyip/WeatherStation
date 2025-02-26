@@ -22,32 +22,34 @@ void updateDate() {
 }
 
 void updateWeatherIcon(int8_t weather_rating, state_config& state, bool initial) {
-    static const icon_config* optimal = nullptr;
+    static const icon_config* optimal_day = nullptr;
+    static const icon_config* optimal_night = nullptr;
 
-    if (initial && weather_rating < positive_weathers[3].min_rating &&
-        weather_rating > negative_weathers[0].max_rating && optimal != nullptr) {
-        drawIcon(*optimal);
-    }
-
+    bool condition;
     if (weather_rating >= 0) {
+        condition = state.daytime;
         for (const auto& config : positive_weathers) {
             if (weather_rating >= config.min_rating && weather_rating <= config.max_rating) {
-                optimal = state.daytime ? &config.option1 : &config.option2;
-                clearRectangle(weather_icon);
-                drawIcon(*optimal);
+                optimal_day = &config.option1;
+                optimal_night = &config.option2;
                 break;
             }
         }
     } else {
+        condition = state.summertemp;
         for (const auto& config : negative_weathers) {
             if (weather_rating >= config.min_rating && weather_rating <= config.max_rating) {
-                optimal = state.summertemp ? &config.option1 : &config.option2;
-                clearRectangle(weather_icon);
-                drawIcon(*optimal);
+                optimal_day = &config.option1;
+                optimal_night = &config.option2;
                 break;
             }
         }
     }
+
+    if (!optimal_day || !optimal_night) return;
+    const icon_config* optimal = condition ? optimal_day : optimal_night;
+    clearRectangle(weather_icon);
+    drawIcon(*optimal);
 }
 
 void updateConnectionIcon(enum conn_statuses connection_status, bool initial) {
