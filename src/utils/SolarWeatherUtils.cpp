@@ -1,7 +1,7 @@
 #include <utils/SolarWeatherUtils.h>
 
 int8_t findWeatherRating(int8_t press_rate, int8_t hum_rate, int8_t temp_rate) {
-    int8_t rating = PRESS_WEIGHT * press_rate + HUM_WEIGHT * hum_rate + TEMP_WEIGHT * temp_rate;
+    int8_t rating = PRESS_WEIGHT * press_rate - HUM_WEIGHT * hum_rate + TEMP_WEIGHT * temp_rate;
     return constrain(rating, -100, 100);
 }
 
