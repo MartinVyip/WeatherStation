@@ -19,6 +19,7 @@ hardware/
 │       └── Layout PDFs              # Top/Bottom views
 ├── SensModule/
 │   ├── Schematic_SensingModule.pdf  # Circuit design for the module
+│   ├── Drawing_SensingModule.pdf    # Module assembly drawing
 │   ├── 3Dmodels/                    # 3D models of the module
 │   └── PCB/                         # PCB designs
 include/
