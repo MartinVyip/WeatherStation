@@ -9,6 +9,7 @@ A comprehensive weather monitoring system tracking both indoor and outdoor param
 hardware/
 ├── BaseStation/
 │   ├── Schematic_BaseStation.pdf    # Circuit design for Base Station
+│   ├── Drawing_BaseStation.pdf      # Base Station assembly drawing
 │   ├── 3Dmodels/
 │   │   ├── .sldprt/                 # SolidWorks parts
 │   │   └── .stl/                    # Printable 3D files
@@ -122,4 +123,4 @@ The module is powered by a combination of a solar panel with a 25F supercapacito
 A single-chip boost converter has been added to step up the voltage from the power sources to a stable 3.6V. This ensures reliable operation even with low input voltage (as low as 400mV) from the solar panel. [Power supply redundancy schematic](https://elentec.narod.ru/Documents/part10/Index0.htm) prioritizes the higher voltage source, allowing the module to operate seamlessly under varying conditions.
 
 ### **Low Power Consumption**
-The module is exceptionally efficient, consuming just 5.8µA in idle mode (99.5% of the time). This allows the lithium battery to power the module for over four years without solar input.
+The module is exceptionally efficient, consuming just 9.7µA in idle mode (99.5% of the time). This allows the lithium battery to power the module for over two years without solar input.
